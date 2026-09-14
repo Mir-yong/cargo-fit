@@ -1,0 +1,2286 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cargo Fit — FCL 다중 목적지 배송 계획</title>
+<!-- [추가됨] 브랜드 아이콘. 작은 크기(브라우저 탭 16~32px)에서는 전체
+     아이콘의 원형 배지·워드마크가 뭉개져 읽히지 않으므로, 컨테이너 마크만
+     정사각으로 잘라낸 버전을 파비콘·헤더 로고에 쓴다. 전체 아이콘은 크게
+     보이는 곳(iOS 홈 화면 등)에만 사용. -->
+<link rel="icon" type="image/png" sizes="32x32" href="/static/brand/favicon-32.png">
+<link rel="icon" type="image/png" sizes="64x64" href="/static/brand/favicon-64.png">
+<link rel="apple-touch-icon" href="/static/brand/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  /* [수정됨] UI/UX 전면 리디자인 — "개발자용 대시보드" 느낌을 벗기 위해
+     팔레트를 Linear/Stripe류 SaaS 제품의 중립 그레이 스케일로 다시
+     맞췄다(기존 라이트 리스킨보다 더 무채색에 가까움). 변수명은 그대로
+     둬서 전체 CSS가 자동으로 새 값을 입는다. */
+  --void:#F7F8FA;         /* 페이지 배경 */
+  --deep:#FFFFFF;         /* 패널 */
+  --deep-2:#FAFBFC;       /* 미세하게 구분되는 배경(세그먼트 트랙 등) */
+  --edge:#E5E7EB;         /* 경계 */
+  --edge-lit:#BFDBFE;     /* 밝은 경계(포커스/활성) */
+  --ink:#111827;          /* 본문 텍스트 */
+  --ink-2:#6B7280;        /* 보조 텍스트 */
+  --cyan:#2563EB;         /* Primary accent */
+  --amber:#F59E0B;        /* Warning */
+  --lime:#16A34A;         /* Success */
+  --rose:#DC2626;         /* Danger */
+  --violet:#7C3AED;
+  --r:10px;               /* [수정됨] 16px → 10px, 과도한 라운드 지양 */
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  background:var(--void);color:var(--ink);
+  font-family:'IBM Plex Sans KR',system-ui,sans-serif;
+  font-size:15px;line-height:1.55;overflow:hidden;-webkit-font-smoothing:antialiased;
+}
+.mono{font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums}
+
+.app{position:relative;z-index:1;display:flex;flex-direction:column;height:100vh}
+
+/* ── 헤더 ── */
+header{
+  display:flex;align-items:center;gap:18px;padding:0 22px;height:66px;flex:0 0 66px;
+  background:#FFFFFF;
+  border-bottom:1px solid var(--edge);
+}
+.logo{
+  width:34px;height:34px;border-radius:8px;overflow:hidden;
+  border:1px solid var(--edge);background:#F4F7FD;flex:0 0 34px;
+}
+.logo img{width:100%;height:100%;object-fit:contain;display:block;padding:1px}
+.brand b{font-size:16px;font-weight:700;letter-spacing:.01em;display:block;line-height:1.15}
+.brand b i{font-style:normal;color:var(--cyan)}
+.brand small{font-size:10px;color:var(--ink-2);letter-spacing:.14em;font-weight:500}
+/* [수정됨] 요청 A: 스텝 칩의 시각적 무게를 가볍게 — 비활성은 테두리 없이
+   텍스트만, 활성만 은은한 배경 tint로 표시(테두리·그림자 제거). */
+.steps{display:flex;gap:4px;margin-left:auto}
+.step{
+  display:flex;align-items:center;gap:7px;padding:6px 12px;border-radius:7px;
+  font-size:13px;border:1px solid transparent;color:var(--ink-2);background:transparent;
+}
+.step.on{
+  color:var(--cyan);background:rgba(37,99,235,.07);
+}
+.step b{font-family:'IBM Plex Mono',monospace;font-weight:700;opacity:.7}
+/* [추가됨] 요청 36: 이동 가능한 단계는 hover, 잠긴 단계는 흐리게 + 클릭 불가 */
+.step:not(.locked){cursor:pointer}
+.step:not(.locked):not(.on):hover{background:rgba(17,24,39,.04);color:var(--ink)}
+.step.locked{opacity:.38;cursor:not-allowed}
+
+main{display:flex;flex:1;min-height:0;gap:13px;padding:13px;position:relative}
+
+/* [추가됨] 요청 B/10: 업로드 전 Empty State를 실제 작업 화면과 분리.
+   #drop/#file은 새로 만들지 않고 여기로 옮긴 것 — upload()/drop.onclick
+   등 기존 JS는 getElementById로 요소를 찾으므로 위치 이동만으로 그대로
+   동작한다. .pre-upload 동안 #left/#center/#right는 DOM에 그대로
+   남아있지만(3D 씬 등 내부 상태 보존) visibility:hidden으로 안 보이게만
+   한다. */
+#emptyState{display:none}
+body.pre-upload #emptyState{
+  display:flex;position:absolute;inset:0;z-index:20;
+  flex-direction:column;align-items:center;justify-content:center;gap:22px;
+  background:var(--void);
+}
+body.pre-upload #left,body.pre-upload #center,body.pre-upload #right{visibility:hidden}
+.es-logo{width:168px;height:168px;display:block;margin-bottom:-14px;
+  border-radius:34px;object-fit:contain}
+.es-hero{text-align:center}
+.es-hero .t{font-size:26px;font-weight:700;letter-spacing:-.01em}
+.es-hero .s{font-size:14.5px;color:var(--ink-2)}
+.es-hint{font-size:12px;color:var(--ink-2);text-align:center;max-width:480px;
+  font-family:'IBM Plex Mono',monospace;line-height:1.7}
+/* .sec-h::after(구분선)가 flex:1로 남는 공간을 채우므로, 이 버튼을
+   order:1로 밀어 divider 뒤(맨 오른쪽)에 오게 한다. */
+.reupload-btn{order:1;background:none;border:0;color:var(--ink-2);
+  font-family:inherit;font-size:11.5px;font-weight:600;cursor:pointer;padding:2px 4px;white-space:nowrap}
+.reupload-btn:hover{color:var(--cyan)}
+
+/* ── 패널 공통 ── */
+.panel{
+  background:var(--deep);
+  border:1px solid var(--edge);border-radius:var(--r);
+}
+
+/* ── 좌 ── */
+#left{width:312px;flex:0 0 312px;overflow-y:auto;transition:flex-basis .26s,width .26s}
+#left.collapsed{width:52px;flex:0 0 52px;overflow:hidden}
+.lp{padding:19px}
+#left.collapsed .lp{display:none}
+.rail{display:none;height:100%;padding:18px 0;cursor:pointer;
+  flex-direction:column;align-items:center;gap:18px}
+#left.collapsed .rail{display:flex}
+.rail .chev{color:var(--cyan);font-size:19px;font-weight:700}
+.rail .vtext{writing-mode:vertical-rl;font-size:12.5px;color:var(--ink-2);
+  letter-spacing:.1em;white-space:nowrap;font-weight:600}
+
+.sec{margin-bottom:22px}
+.sec-h{
+  display:flex;align-items:center;gap:9px;margin-bottom:12px;
+  font-size:11.5px;font-weight:700;letter-spacing:.14em;color:var(--cyan);text-transform:uppercase;
+}
+.sec-h::before{content:'';width:3px;height:13px;background:var(--cyan);border-radius:2px;
+  box-shadow:0 0 9px var(--cyan)}
+.sec-h::after{content:'';flex:1;height:1px;
+  background:linear-gradient(90deg,var(--edge-lit),transparent)}
+
+.drop{
+  border:1.5px dashed var(--edge-lit);border-radius:var(--r);padding:26px 16px;
+  text-align:center;cursor:pointer;transition:.18s;background:rgba(37,99,235,.035);
+}
+.drop:hover,.drop.over{border-color:var(--cyan);background:rgba(37,99,235,.07);
+  box-shadow:inset 0 0 0 1px rgba(37,99,235,.15)}
+.drop .ic{font-size:27px;color:var(--cyan);margin-bottom:9px;line-height:1}
+.drop .t{font-size:14.5px;font-weight:600}
+.drop .s{font-size:12.5px;color:var(--ink-2);margin-top:4px}
+.drop.has{border-style:solid;border-color:var(--lime);background:rgba(22,163,74,.07);
+  text-align:left;padding:15px}
+
+.kv{display:flex;justify-content:space-between;font-size:13.5px;padding:6px 0;
+  border-bottom:1px solid var(--edge)}
+.kv:last-child{border:0}
+.kv .k{color:var(--ink-2)}
+.kv .v{font-weight:600;font-family:'IBM Plex Mono',monospace}
+
+/* [수정됨] 요청 3/7: 선택 상태 accent를 amber(경고 색상으로 의미 재배정)
+   에서 primary blue로 통일 — "선택됨"과 "경고"가 같은 색을 쓰지 않도록.
+   배경 tint·그림자도 제거하고 왼쪽 accent 바 하나로 가볍게 표시. */
+.opt{
+  display:flex;align-items:center;gap:11px;padding:11px 13px;margin-bottom:5px;
+  border:1px solid transparent;border-left:2px solid transparent;border-radius:7px;
+  cursor:pointer;transition:.14s;background:transparent;
+}
+.opt:hover{background:var(--deep-2)}
+.opt.sel{border-color:var(--edge);border-left-color:var(--cyan);background:rgba(37,99,235,.04)}
+.opt .dot{width:13px;height:13px;border-radius:50%;border:2px solid var(--edge-lit);flex:0 0 13px}
+.opt.sel .dot{border-color:var(--cyan);border-width:4px}
+.opt .body{flex:1;min-width:0}
+.opt .t{font-size:14px;font-weight:600}
+.opt .s{font-size:12px;color:var(--ink-2);margin-top:2px;font-family:'IBM Plex Mono',monospace}
+.opt .badge{font-size:10px;font-weight:700;color:var(--ink-2);background:var(--deep-2);
+  border:1px solid var(--edge);padding:3px 7px;border-radius:4px;white-space:nowrap;letter-spacing:.04em}
+
+/* [수정됨] 팀 피드백: 계산 방식이 '정밀 탐색' 하나뿐인데 .opt처럼 고를
+   수 있는 카드(점·클릭)로 보여줄 필요가 없다는 지적 — 선택 UI가 아닌
+   정적 정보 카드로 바꿨다. */
+.mode-info{padding:12px 13px;margin-bottom:7px;border:1px solid var(--edge);border-radius:8px;
+  background:var(--deep-2)}
+.mode-info .t{font-size:14px;font-weight:600}
+.mode-info .s{font-size:12px;color:var(--ink-2);margin-top:2px;font-family:'IBM Plex Mono',monospace}
+
+.field label{display:block;font-size:12.5px;color:var(--ink-2);margin-bottom:7px;font-weight:500}
+.field .row{display:flex;gap:11px;align-items:center}
+.field input[type=range]{flex:1;accent-color:var(--cyan);height:5px}
+.field .num{font-family:'IBM Plex Mono',monospace;font-weight:700;font-size:17px;
+  min-width:36px;text-align:right;color:var(--cyan)}
+.hintline{font-size:12px;color:var(--ink-2);margin-top:8px;font-family:'IBM Plex Mono',monospace}
+
+/* [추가됨] 신규 물리 제약 3종(지지율/최대 적재 단수/CoG 허용오차) UI —
+   기존 .field 패턴을 그대로 따르는 카드형 컨트롤. */
+.field-check{display:flex;align-items:center;gap:8px;margin-top:9px;font-size:12.5px;color:var(--ink-2)}
+.field-check input[type=checkbox]{accent-color:var(--cyan);width:15px;height:15px;cursor:pointer}
+
+/* [수정됨] 요청 7: 주요 액션 버튼 색을 amber(경고 색상)에서 primary
+   blue로 통일 — "계산 실행"은 상태 색이 아니라 브랜드 액션이어야 한다. */
+.btn{
+  width:100%;padding:14px;border:0;border-radius:8px;cursor:pointer;margin-top:16px;
+  background:var(--cyan);color:#FFFFFF;
+  font-weight:600;font-size:14.5px;font-family:inherit;transition:.15s;
+  letter-spacing:.01em;
+}
+.btn:hover:not(:disabled){background:#1D4ED8}
+.btn:active:not(:disabled){background:#1E40AF;transform:translateY(1px)}
+.btn:disabled{background:#E5E7EB;color:#9CA3AF;cursor:not-allowed}
+/* [추가됨] 요청 35: 계산 중 상태 — 진행 중임을 띠 애니메이션으로 표시 */
+.btn.loading{background:#93C5FD;color:#fff;
+  background-image:linear-gradient(90deg,rgba(255,255,255,.35) 25%,transparent 25%,
+    transparent 50%,rgba(255,255,255,.35) 50%,rgba(255,255,255,.35) 75%,transparent 75%);
+  background-size:22px 22px;animation:btnbar 0.9s linear infinite}
+@keyframes btnbar{from{background-position:0 0}to{background-position:22px 0}}
+
+/* [추가됨] 요청 10: 고급 설정 접기 */
+.adv{margin-top:14px;border-top:1px solid var(--edge);padding-top:12px}
+.adv>summary{cursor:pointer;font-size:12.5px;font-weight:600;color:var(--ink-2);
+  list-style:none;display:flex;align-items:center;gap:6px}
+.adv>summary::-webkit-details-marker{display:none}
+.adv>summary::before{content:'▸';font-size:10px;transition:transform .14s;display:inline-block}
+.adv[open]>summary::before{transform:rotate(90deg)}
+.adv>summary:hover{color:var(--cyan)}
+
+/* [추가됨] 요청 9: 화물 목록 검색 */
+.cargo-search{width:100%;margin-bottom:8px;padding:7px 10px;border-radius:7px;
+  border:1px solid var(--edge);background:var(--deep-2);color:var(--ink);
+  font-family:inherit;font-size:12.5px;outline:none}
+.cargo-search:focus{border-color:var(--edge-lit);background:#fff}
+.cargo-search::placeholder{color:var(--ink-2)}
+
+/* [추가됨] 요청 8: CSV 템플릿 다운로드 (secondary 버튼) */
+.es-tmpl{background:none;border:0;color:var(--cyan);font-family:inherit;
+  font-size:12.5px;font-weight:600;cursor:pointer;padding:6px 10px;border-radius:7px}
+.es-tmpl:hover{background:rgba(37,99,235,.07)}
+
+/* ── 중앙 ── */
+#center{flex:1;display:flex;flex-direction:column;min-width:0;gap:13px}
+/* [수정됨] 요청 E: 적재안 3개를 각각 테두리·그림자를 가진 카드에서
+   하나의 알약형 세그먼트 컨트롤로. pickSol(i)/.on 토글 로직은 그대로,
+   시각적 표현만 카드→세그먼트. */
+#tabs{display:none;gap:2px;padding:3px;background:var(--deep-2);
+  border:1px solid var(--edge);border-radius:9px}
+#tabs.on{display:flex}
+.tab{
+  flex:1;padding:9px 13px;border-radius:7px;cursor:pointer;
+  background:transparent;transition:.14s;text-align:left;
+}
+.tab:hover{background:rgba(17,24,39,.03)}
+.tab.on{background:var(--deep)}
+.tab .t{font-size:13.5px;font-weight:600;color:var(--ink-2)}
+.tab.on .t{color:var(--cyan);font-weight:700}
+.tab .m{font-size:12px;color:var(--ink-2);margin-top:2px;font-family:'IBM Plex Mono',monospace}
+
+/* [추가됨] 용적률/리핸들링 가중치 직접 조정 슬라이더 — 기존 3개 프리셋
+   탭(최대 용적률/균형/최소 리핸들링)은 그대로 두고, 그 아래에 사용자가
+   두 지표 사이 임의의 지점을 직접 고를 수 있는 영역을 추가한다. */
+#weightBox{display:none;border:1px solid var(--edge);border-radius:9px;padding:11px 15px;
+  background:var(--deep-2);transition:.16s}
+#weightBox.on{display:block}
+#weightBox.active{border-color:var(--edge-lit)}
+/* [수정됨] 요청 F: 가중치 슬라이더를 기본 접힘 상태로 — 헤더 행(.wb-h)을
+   클릭하면 펼쳐지는 Advanced 토글. 기본 사용자는 3개 세그먼트만 보고,
+   필요한 사람만 펼쳐서 직접 조정한다. 배지(OFF/적용됨)는 접힌 상태에서도
+   보이므로 커스텀 가중치 적용 여부는 항상 한눈에 들어온다. */
+.wb-h{font-size:13.5px;font-weight:600;display:flex;align-items:center;gap:9px;cursor:pointer;
+  color:var(--ink-2)}
+.wb-h .chev{margin-left:2px;font-size:10px;transition:transform .14s;color:var(--ink-2)}
+#weightBox.expanded .wb-h .chev{transform:rotate(90deg)}
+.wb-badge{font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:20px;
+  background:var(--edge);color:var(--ink-2);letter-spacing:.05em}
+.wb-badge.on{background:rgba(37,99,235,.14);color:var(--cyan)}
+.wb-body{display:none}
+#weightBox.expanded .wb-body{display:block}
+.wb-row{display:flex;align-items:center;gap:11px;margin-top:30px;margin-bottom:6px}
+/* [수정됨] 팀 피드백: 슬라이더 양 끝이 뭘 뜻하는지 지금보다 잘 보이게 —
+   크기·굵기를 키우고, 파레토 차트에서 쓰는 색(최소 리핸들링=라임,
+   최대 용적률=amber)과 맞춰 방향을 색으로도 알 수 있게 했다. */
+.wb-end{font-size:12.5px;font-weight:700;font-family:'IBM Plex Mono',monospace;white-space:nowrap}
+.wb-end-lo{color:var(--lime)}
+.wb-end-hi{color:var(--amber)}
+
+/* [추가됨] 슬라이더를 어디로 움직여야 다른 해가 나오는지 미리 보여주는
+   눈금. 파레토 프론트가 이산적인 대안들의 집합이라, 슬라이더를 조금씩
+   움직여도 대부분 구간에서는 같은 해가 그대로 유지되다가 특정 지점에서만
+   용적률이 실제로 바뀐다 — 그 지점들을 .gauge .mark(적재 중량 카드의
+   기준선)와 같은 눈금 스타일로 슬라이더 트랙 아래에 표시한다. */
+.wb-slider{position:relative;flex:1}
+.wb-slider input[type=range]{width:100%;display:block;accent-color:var(--cyan);cursor:pointer;height:5px}
+.wb-ticks{position:absolute;left:0;right:0;top:100%;height:8px;margin-top:4px;pointer-events:none}
+.wb-tick{position:absolute;top:0;width:2px;height:8px;background:var(--ink-2);opacity:.55;
+  border-radius:1px;transform:translateX(-50%)}
+
+/* [추가됨] 2번 요청: 슬라이더가 지금 어떤 가중치 비율인지 보이게 —
+   핸들을 따라다니는 말풍선(.wb-bubble)과 헤더 줄의 상시 표시(.wb-ratio).
+   말풍선이 슬라이더 위쪽 공간을 쓰므로 .wb-row의 위 여백을 늘렸다. */
+.wb-ratio{font-family:'IBM Plex Mono',monospace;font-size:11.5px;font-weight:600;
+  color:var(--ink-2);letter-spacing:.02em;white-space:nowrap}
+.wb-ratio b{color:var(--cyan);font-weight:700}
+.wb-ratio i{color:var(--lime);font-style:normal;font-weight:700}
+.wb-bubble{position:absolute;bottom:100%;margin-bottom:9px;transform:translateX(-50%);
+  white-space:nowrap;padding:3px 9px;border-radius:20px;border:1px solid var(--edge-lit);
+  background:var(--deep-2);color:var(--ink);font-family:'IBM Plex Mono',monospace;
+  font-size:11px;font-weight:700;pointer-events:none;box-shadow:0 2px 8px rgba(15,23,42,.1)}
+.wb-bubble b{color:var(--amber);font-weight:700}
+.wb-bubble i{color:var(--lime);font-style:normal;font-weight:700}
+
+/* [수정됨] 팀 피드백: '용적률 최적화'/'시간(리핸들링) 최적화' 버튼 2개가
+   슬라이더 양 끝(100/0)으로 점프하는 것과 완전히 같은 화면을 보여줘서
+   중복이고 화면만 많이 차지한다는 지적을 받아 제거했다. 대신 슬라이더
+   양 끝 라벨(.wb-end)을 더 잘 보이게 키우는 걸로 그 역할을 대신한다.
+   '비용 최적화'는 멘토님 피드백대로 아직 구현 전이라도 향후 계획으로
+   버튼만 남겨둬야 해서, wb-h 헤더 줄에 작은 배지 버튼 하나로 옮겼다. */
+.cost-soon{
+  margin-left:auto;display:flex;align-items:center;gap:6px;padding:5px 10px;border-radius:20px;
+  border:1px solid var(--edge);background:var(--deep-2);color:var(--ink-2);
+  font-size:11.5px;font-weight:600;font-family:inherit;cursor:not-allowed;opacity:.85;
+}
+.gb-soon{font-size:9px;font-weight:700;padding:1px 6px;border-radius:8px;
+  background:var(--edge);color:var(--ink-2);letter-spacing:.03em}
+
+/* [추가됨] 파레토 최적해 집합 전체 분포 차트(결과 화면 맨 아래). 회색 점 =
+   탐색이 찾아낸 후보 전체, 색이 있는 점(모양으로도 구분) = 지금 선택된 해. */
+.pareto-wrap{width:100%}
+.pareto-svg{width:100%;height:auto;display:block}
+.pareto-legend{display:flex;flex-wrap:wrap;gap:11px;margin-top:9px}
+.pl-item{display:flex;align-items:center;gap:5px;font-size:11.5px;color:var(--ink-2)}
+/* [추가됨] 팀 피드백: 파레토 그래프의 점을 클릭하면 그 해로 화면이 바로
+   바뀌게 해달라는 요청 — 점에 마우스를 올리면 밝아져서 누를 수 있다는
+   걸 알 수 있게 한다. */
+.pareto-pt{cursor:pointer}
+.pareto-pt:hover{filter:brightness(1.3)}
+
+/* [수정됨] 3D 뷰포트 배경 — Three.js scene.background(스크립트에서 별도
+   설정)와 맞춰 옅은 그레이-블루로. 캔버스가 렌더링되기 전 잠깐 보이는
+   배경색이라 씬 배경색과 최대한 비슷해야 전환이 어색하지 않다. */
+#stage{flex:1;position:relative;min-height:0;border-radius:var(--r);overflow:hidden;
+  border:1px solid var(--edge);background:#E9EEF5}
+#cv{width:100%;height:100%;display:block}
+
+/* 뷰포트 HUD */
+.hud{position:absolute;pointer-events:none;z-index:3;font-family:'IBM Plex Mono',monospace}
+/* [수정됨] 요청 D: 뷰 세그먼트 컨트롤이 top:14px;left:14px를 새로 차지하면서
+   기존 치수/화물수/해 라벨 칩과 겹치던 문제 — 세그먼트 컨트롤 바로 아래로 내림. */
+#hudTL{top:58px;left:14px;display:flex;gap:8px;flex-wrap:wrap}
+.chip{
+  padding:6px 10px;border-radius:7px;font-size:12px;font-weight:500;
+  background:rgba(255,255,255,.9);border:1px solid var(--edge);color:var(--ink-2);
+  backdrop-filter:blur(8px);
+}
+.chip b{color:var(--ink);font-weight:600}
+#hudBR{bottom:18px;left:14px;font-size:11px;color:var(--ink-2);opacity:.8}
+
+/* [수정됨] 요청 D: CAD 툴 느낌의 모서리 브래킷(.corner) 장식 요소 제거 —
+   기능 없는 순수 장식이라 "지양할 것" 지시(장식적 요소)에 해당. */
+
+/* [수정됨] 요청 D: 세로 5버튼(ISO/SIDE/TOP/DOOR/⛶)을 스테이지 상단
+   좌측의 가로 세그먼트 컨트롤 [3D][TOP][SIDE][DOOR] 하나로 통합.
+   #right의 .toggle(화물구분)과 같은 시각 언어(알약형 트랙 + 선택
+   세그먼트만 흰 배경) — 클래스는 별도(.vseg)지만 선언은 동일하게
+   맞췄다. 전체화면 버튼은 여기서 분리해 우측 하단 독립 아이콘으로. */
+#viewBtns{position:absolute;top:14px;left:14px;z-index:4;
+  display:flex;gap:2px;padding:3px;border-radius:9px;
+  background:rgba(255,255,255,.9);border:1px solid var(--edge);backdrop-filter:blur(8px)}
+.vbtn{
+  padding:7px 13px;border-radius:6px;border:1px solid transparent;
+  background:transparent;color:var(--ink-2);cursor:pointer;font-size:11.5px;
+  font-family:'IBM Plex Mono',monospace;font-weight:600;transition:.14s;
+}
+.vbtn:hover{color:var(--ink)}
+.vbtn.act{color:var(--cyan);background:var(--deep-2);border-color:var(--edge)}
+
+/* [수정됨] 요청 24: 부차적인 뷰포트 도구는 우측 하단에 작게 모아둔다. */
+#viewTools{position:absolute;bottom:14px;right:14px;z-index:4;display:flex;gap:4px}
+.vtool{
+  width:32px;height:32px;border-radius:8px;border:1px solid var(--edge);
+  background:rgba(255,255,255,.9);color:var(--ink-2);cursor:pointer;font-size:13px;
+  backdrop-filter:blur(8px);transition:.14s}
+.vtool:hover{color:var(--cyan);border-color:var(--edge-lit);background:#fff}
+.vtool.act{color:var(--cyan);border-color:var(--edge-lit)}
+
+/* [추가됨] 요청 9/26: 선택한 화물 상세 popover */
+#cargoPop{
+  position:absolute;top:14px;right:14px;z-index:5;width:228px;display:none;
+  background:rgba(255,255,255,.96);border:1px solid var(--edge);border-radius:10px;
+  padding:12px 13px;backdrop-filter:blur(10px);
+  box-shadow:0 4px 20px rgba(15,23,42,.10);
+}
+#cargoPop.on{display:block}
+.cp-h{display:flex;align-items:center;gap:7px;margin-bottom:9px;
+  padding-bottom:9px;border-bottom:1px solid var(--edge)}
+.cp-h b{font-size:14.5px;font-weight:700}
+.cp-h span{font-size:11px;color:var(--ink-2);font-family:'IBM Plex Mono',monospace}
+.cp-x{margin-left:auto;background:none;border:0;color:var(--ink-2);cursor:pointer;
+  font-size:12px;padding:2px 4px;line-height:1}
+.cp-x:hover{color:var(--ink)}
+.cp-row{display:flex;justify-content:space-between;gap:10px;font-size:12px;padding:3.5px 0}
+.cp-row span{color:var(--ink-2)}
+.cp-row b{font-family:'IBM Plex Mono',monospace;font-weight:600}
+.cp-tag{margin-top:8px;font-size:11px;font-weight:600;color:var(--amber);
+  background:rgba(245,158,11,.1);border-radius:5px;padding:4px 7px;text-align:center}
+
+/* [추가됨] 팀 피드백: 적재 화면이 너무 작아 보기 불편하다는 지적 —
+   전체화면 전환 버튼. #center(탭+가중치 슬라이더+적재 화면+재생 바)
+   전체를 전체화면으로 띄워서, 전체화면 상태에서도 재생/탐색 조작이
+   그대로 가능하게 한다. 전체화면이 되면 main의 padding/gap을 잃으므로
+   자체 padding을 준다. */
+#center:fullscreen{background:var(--void);padding:13px;gap:13px}
+#center:-webkit-full-screen{background:var(--void);padding:13px;gap:13px}
+
+#busy{
+  position:absolute;inset:0;display:none;z-index:6;flex-direction:column;
+  align-items:center;justify-content:center;gap:26px;background:rgba(248,250,252,.94);
+}
+#busy.on{display:flex}
+.busy-t{font-size:16px;font-weight:600;letter-spacing:.02em}
+.scan{width:420px;height:6px;background:var(--edge);border-radius:4px;overflow:hidden;
+  position:relative}
+.scan i{display:block;height:100%;width:0;border-radius:4px;
+  background:linear-gradient(90deg,#93C5FD,var(--cyan));transition:width .3s}
+.bstat{display:flex;gap:42px}
+.bstat div{text-align:center}
+.bstat .v{font-family:'IBM Plex Mono',monospace;font-size:30px;font-weight:700;color:var(--cyan)}
+.bstat .l{font-size:11.5px;color:var(--ink-2);margin-top:4px;letter-spacing:.1em}
+
+/* [수정됨] 요청 H: 재생바 요소를 더 얇고 조용하게 — 버튼 테두리/배경을
+   기본은 투명, hover·active일 때만 색을 준다. */
+#play{display:none;align-items:center;gap:12px;padding:11px 16px}
+#play.on{display:flex}
+.pbtn{
+  width:36px;height:36px;border-radius:8px;border:1px solid transparent;
+  background:transparent;color:var(--ink);cursor:pointer;font-size:13px;transition:.14s;
+}
+.pbtn:hover{background:var(--deep-2)}
+.pbtn.act{border-color:var(--edge-lit);background:rgba(37,99,235,.1);color:var(--cyan)}
+#seek{flex:1;accent-color:var(--cyan);cursor:pointer;height:4px}
+.pcount{font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:600;
+  min-width:100px;text-align:right;color:var(--ink-2)}
+.spd{display:flex;gap:2px;padding:2px;background:var(--deep-2);border-radius:7px}
+.spd button{
+  padding:6px 10px;font-size:11.5px;font-weight:600;border:0;
+  background:transparent;color:var(--ink-2);border-radius:5px;cursor:pointer;
+  font-family:'IBM Plex Mono',monospace;
+}
+.spd button.on{color:var(--cyan);background:var(--deep)}
+
+/* ── 우 (요청 G: KPI 패널 전면 개편) ── */
+#right{width:306px;flex:0 0 306px;overflow-y:auto;padding:19px}
+/* [수정됨] 히어로 — 진한 그래디언트 카드(색상 과다) 대신, 흰 배경 위에
+   숫자 하나만 압도적으로 크게. 브랜드 컬러는 숫자 자체에만 쓴다. */
+.hero{padding:2px 0 18px;margin-bottom:4px;border-bottom:1px solid var(--edge)}
+.hero .l{font-size:12px;letter-spacing:.06em;color:var(--ink-2);font-weight:600}
+.hero .v{font-family:'IBM Plex Mono',monospace;font-size:52px;font-weight:700;
+  line-height:1;margin-top:6px;color:var(--cyan)}
+.hero .s{font-size:13px;color:var(--ink-2);margin-top:8px}
+
+/* [추가됨] 요청 6: "검토 필요" — 경고/정상 상태를 명확히 분리한 전용
+   패널. 문제가 없으면 초록 확인줄 하나만, 있으면 항목별로 danger(빨강,
+   실제 오류)/warning(주황, 주의) 색상만 써서 과도한 빨강 사용을 피한다. */
+.review{margin:14px 0;padding:0 2px}
+.review-h{font-size:11px;font-weight:700;letter-spacing:.1em;color:var(--ink-2);
+  text-transform:uppercase;margin-bottom:8px}
+.review-ok{display:flex;align-items:center;gap:8px;color:var(--lime);
+  font-size:13px;font-weight:600;padding:8px 0}
+.review-item{display:flex;gap:9px;padding:9px 0;border-top:1px solid var(--edge)}
+.review-item:first-child{border-top:0}
+.review-item .ic{font-size:13px;line-height:1.4}
+.review-item .body{flex:1;min-width:0}
+.review-item .t{font-size:13px;font-weight:600}
+.review-item .d{font-size:12px;color:var(--ink-2);margin-top:2px}
+.review-item.danger .ic,.review-item.danger .t{color:var(--rose)}
+.review-item.warning .ic,.review-item.warning .t{color:var(--amber)}
+
+/* [수정됨] 동급 카드 4개(.grid2/.card) → 레이블-값 리스트(.mrow). 숫자는
+   여전히 크고 굵게(위계 유지), 다만 테두리·배경으로 각각을 카드처럼
+   구획하지 않고 얇은 구분선만 쓴다. */
+.mrow{padding:11px 0;border-top:1px solid var(--edge)}
+.mrow:first-child{border-top:0}
+.mrow-h{display:flex;justify-content:space-between;align-items:baseline}
+.mrow .l{font-size:12.5px;color:var(--ink-2)}
+.mrow .v{font-family:'IBM Plex Mono',monospace;font-weight:700;font-size:19px}
+.mrow .s{font-size:11.5px;color:var(--ink-2);margin-top:5px;font-family:'IBM Plex Mono',monospace}
+
+.gauge{height:5px;background:var(--edge);border-radius:4px;margin-top:8px;position:relative}
+.gauge i{display:block;height:100%;border-radius:4px;background:var(--lime)}
+.gauge .mark{position:absolute;top:-2.5px;width:2px;height:10px;background:var(--ink-2);opacity:.6}
+
+.sub-h{font-size:11px;font-weight:700;color:var(--ink-2);margin:18px 0 10px;
+  letter-spacing:.1em;text-transform:uppercase}
+.legend{display:flex;flex-direction:column;gap:7px}
+.lg{display:flex;align-items:center;gap:10px;font-size:13px}
+.lg .sw{width:13px;height:13px;border-radius:4px;flex:0 0 13px;border:1px solid rgba(15,23,42,.12)}
+.lg .n{flex:1;font-weight:500;color:var(--ink)}
+.lg .c{font-family:'IBM Plex Mono',monospace;font-weight:600;color:var(--ink-2)}
+.toggle{display:flex;gap:2px;margin-bottom:11px;padding:3px;background:var(--deep-2);
+  border:1px solid var(--edge);border-radius:8px}
+.toggle button{
+  flex:1;padding:7px;font-size:12px;font-weight:600;border:0;border-radius:6px;
+  background:transparent;color:var(--ink-2);cursor:pointer;font-family:inherit;
+}
+.toggle button.on{color:var(--cyan);background:var(--deep)}
+
+.empty{color:var(--ink-2);font-size:13px;text-align:center;padding:52px 14px;line-height:1.75}
+.empty .big{font-size:30px;color:var(--edge-lit);margin-bottom:14px}
+.empty .et{font-size:14.5px;font-weight:600;color:var(--ink);margin-bottom:6px}
+.empty .es b{color:var(--cyan);font-weight:600}
+.foot{margin-top:17px;font-size:11.5px;color:var(--ink-2);line-height:1.8;
+  padding-top:13px;border-top:1px solid var(--edge);font-family:'IBM Plex Mono',monospace}
+
+.pdfbtn{
+  display:flex;align-items:center;justify-content:center;gap:8px;width:100%;
+  margin-top:10px;padding:12px;border-radius:9px;cursor:pointer;text-decoration:none;
+  border:1px solid var(--edge-lit);background:rgba(37,99,235,.08);color:var(--cyan);
+  font-weight:600;font-size:13.5px;font-family:inherit;transition:.15s;
+}
+.pdfbtn:hover{border-color:var(--cyan);background:rgba(37,99,235,.14)}
+
+::-webkit-scrollbar{width:9px;height:9px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--edge);border-radius:5px}
+::-webkit-scrollbar-thumb:hover{background:var(--edge-lit)}
+</style>
+</head>
+<body class="pre-upload">
+<div class="app">
+  <header>
+    <!-- [수정됨] 직접 그린 큐브 SVG → 실제 Cargo Fit 브랜드 아이콘(컨테이너 마크) -->
+    <div class="logo">
+      <img src="/static/brand/cargofit-mark-256.png" alt="Cargo Fit">
+    </div>
+    <div class="brand">
+      <b>Cargo<i> </i>Fit</b>
+      <small>FCL MULTI-DROP ROUTING</small>
+    </div>
+    <!-- [수정됨] 요청 36: 단계 네비게이션을 실제로 클릭해 이동할 수 있게 하고,
+         선행 데이터가 없으면(CSV 미업로드 / 계산 결과 없음) 비활성 처리한다. -->
+    <div class="steps">
+      <div class="step on" id="s1" onclick="gotoStep(1)"><b>01</b> 화물 등록</div>
+      <div class="step locked" id="s2" onclick="gotoStep(2)"><b>02</b> 계획 수립</div>
+      <div class="step locked" id="s3" onclick="gotoStep(3)"><b>03</b> 검토</div>
+    </div>
+  </header>
+
+  <main>
+    <!-- [추가됨] 요청 B/10: 업로드 전 Empty State. #drop/#file은 아래
+         #left 사이드바에서 옮겨온 바로 그 엘리먼트 — upload()/드래그앤드롭
+         배선은 무수정으로 그대로 동작한다. -->
+    <div id="emptyState">
+      <!-- 업로드 전 화면은 공간이 넉넉하므로 전체 브랜드 아이콘을 쓴다
+           (헤더·파비콘의 축약 마크와 달리 여기서는 디테일이 다 읽힌다) -->
+      <img class="es-logo" src="/static/brand/cargofit-icon-512.png" alt="Cargo Fit">
+      <div class="es-hero">
+        <div class="s">화물 명세를 업로드하세요</div>
+      </div>
+      <div class="drop" id="drop" style="width:min(480px,90%)">
+        <div class="ic">⬆</div>
+        <div class="t">CSV 파일을 올려주세요</div>
+        <div class="s">클릭하거나 끌어놓기</div>
+      </div>
+      <input type="file" id="file" accept=".csv" hidden>
+      <div class="es-hint">필요한 컬럼: box_id · length_cm · width_cm · height_cm ·<br>
+        weight_kg · destination · priority · shipper</div>
+      <!-- [추가됨] 요청 8: CSV 템플릿 다운로드. 서버에 새 엔드포인트를 만들지 않고
+           클라이언트에서 Blob으로 생성한다(백엔드 무수정 원칙 유지). -->
+      <button class="es-tmpl" onclick="downloadTemplate()">CSV 템플릿 다운로드</button>
+    </div>
+    <aside id="left" class="panel">
+      <div class="rail" onclick="toggleLeft()">
+        <div class="chev">›</div>
+        <div class="vtext" id="railText">화물 정보</div>
+      </div>
+      <div class="lp">
+        
+        <!-- 언제든 패널을 접을 수 있는 닫기 버튼 -->
+        <div style="display: flex; justify-content: flex-end; margin-bottom: 12px;">
+          <button onclick="toggleLeft()" style="background: var(--deep-2); border: 1px solid var(--edge); color: var(--ink-2); padding: 5px 10px; border-radius: 6px; cursor: pointer; font-family: inherit; font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 4px; transition: .15s;" onmouseover="this.style.borderColor='var(--cyan)'; this.style.color='var(--cyan)'" onmouseout="this.style.borderColor='var(--edge)'; this.style.color='var(--ink-2)'">
+            <span style="font-size: 16px; line-height: 1;">‹</span> 접기
+          </button>
+        </div>
+
+        <!-- [수정됨] 요청 B/11: #drop/#file은 #emptyState(업로드 전 화면)로
+             옮겼다 — 업로드가 끝난 뒤 사이드바는 드롭존이 아니라 화물
+             요약 + 재업로드 링크만 보여준다. -->
+        <div class="sec">
+          <div class="sec-h">화물 명세
+            <button class="reupload-btn" onclick="document.body.classList.add('pre-upload')">↻ 변경</button>
+          </div>
+          <div id="summary" style="display:none"></div>
+        </div>
+
+        <div class="sec" id="secBox" style="display:none">
+          <div class="sec-h">컨테이너</div>
+          <div id="conts"></div>
+        </div>
+
+        <div class="sec" id="secStow" style="display:none">
+          <div class="sec-h">적재 방식</div>
+          <div class="opt sel" data-stow="floor" onclick="pickStow('floor')">
+            <div class="dot"></div>
+            <div class="body">
+              <div class="t">바닥적재</div>
+              <div class="s" id="floorNote">화물을 개별 배치</div>
+            </div>
+          </div>
+          <div class="opt" data-stow="pallet" onclick="pickStow('pallet')">
+            <div class="dot"></div>
+            <div class="body">
+              <div class="t">팔레타이징</div>
+              <div class="s" id="palletNote">표준 팔레트로 묶어 배치</div>
+            </div>
+          </div>
+          <div id="palletSpecs" style="display:none;margin-top:10px"></div>
+        </div>
+
+        <div class="sec" id="secMode" style="display:none">
+          <div class="sec-h">계산 방식</div>
+          <!-- [수정됨] 버튼 2개(즉시 실행)에서 '적재 방식'과 같은 opt 카드 선택 방식으로 변경.
+               '현장 대응'을 고르면 세대 수 조절 바가 사라지고(시간 예산 고정 방식이라
+               세대 수와 무관하므로), 아래 '계산하기' 버튼을 눌러야 실제 계산이 시작된다. -->
+          <!-- [수정됨] 우수 프로젝트 제출용 사본: '현장 대응'은 아직 다듬는 중이라
+               일단 카드를 숨기고 '정밀 탐색'만 쓸 수 있게 한다. 코드는 지우지 않고
+               display:none으로만 가려서, 나중에 다시 열 때는 이 style 한 줄만
+               되돌리면 된다. -->
+          <div class="opt" data-mode="fast" onclick="pickMode('fast')" style="display:none">
+            <div class="dot"></div>
+            <div class="body">
+              <div class="t">현장 대응</div>
+              <div class="s">약 1분 · 보조 알고리즘 (현장 변동 즉시 대응)</div>
+            </div>
+          </div>
+          <!-- [수정됨] 팀 피드백: 계산 방식이 '정밀 탐색' 하나뿐인데 고를 수
+               있는 카드(점·클릭)로 보여주면 마치 다른 선택지가 있는 것처럼
+               보인다는 지적 — 선택 UI가 아닌 정적 정보 카드로 바꿨다.
+               data-mode="precise" id는 pickMode()/calcMode 초기값 로직이
+               참조하지 않으므로 그대로 두어도 무방하지만, 더는 클릭되지
+               않으니 onclick/opt/sel 클래스는 제거했다. -->
+          <div class="mode-info" id="modeInfoPrecise">
+            <div class="t">정밀 탐색</div>
+            <div class="s">약 1~2분 · 메인 최적화 (NSGA-II)</div>
+          </div>
+
+          <div class="field" id="genField" style="display:block;margin-top:14px">
+            <label>세대 수 — 많을수록 정밀하지만 오래 걸립니다</label>
+            <div class="row">
+              <input type="range" id="genR" min="10" max="80" step="5" value="30">
+              <span class="num" id="genV">30</span>
+            </div>
+            <div class="hintline" id="timeHint">예상 소요 약 1분</div>
+          </div>
+
+          <!-- [수정됨] 팀 피드백: 계산 전 가중치 슬라이더가 계산 후 결과
+               화면과 완전히 같은 조절을 미리 한 번 더 하게 만들어 화면만
+               복잡하고, 게다가 여길 건드리고 계산하면 결과 화면이 곧장
+               '용적률 70%대' 같은 낮은 값으로 열려 알고리즘이 약해 보인다는
+               지적을 받아 통째로 제거했다. 가중치 조절은 계산이 끝난 뒤
+               결과 화면(#weightBox, #stage 아래)에서만 한다. -->
+
+          <!-- [추가됨] 요청 10: 고급 설정은 기본으로 펼치지 않는다.
+               기본 사용자는 세대 수만 보고 바로 계산, 고급 사용자만 펼쳐서
+               구역 제약·지지율·CoG·적재 단수를 조정한다. -->
+          <details class="adv">
+          <summary>고급 설정</summary>
+          <!-- [추가됨] dblf.decode()/run_nsga2()가 이미 지원하던 use_zones 옵션을
+               화면에 노출. 기본은 구역 우선(리핸들링 절감)이고, 체크하면 구역
+               제약을 풀어서 용적률만 최대화하도록 시도한다.
+               [수정됨] 우수 프로젝트 제출용 사본에서는 '현장 대응'이 숨겨져
+               정밀 탐색만 남으므로, 문구에서도 현장 대응 관련 설명을 뺐다.
+               정밀 탐색은 용적률·리핸들링·무게중심 3개 지표를 항상 파레토
+               방식으로 함께 고려하므로, 이 옵션은 배치 시 구역 제약 자체만
+               끄고 파레토 평가 방식에는 영향을 주지 않는다.
+               [수정됨] 팀 피드백: 계산 전 가중치 슬라이더가 없어졌으므로
+               안내 문구도 계산 후 결과 화면 슬라이더를 가리키게 고쳤다. -->
+          <label class="field" style="display:flex;align-items:flex-start;gap:8px;margin-top:14px;cursor:pointer">
+            <input type="checkbox" id="noZones" style="accent-color:var(--cyan);width:16px;height:16px;flex:0 0 16px;margin-top:2px">
+            <span>
+              <span style="display:block;font-size:13px">하역지 구역 제약 해제</span>
+              <span class="hintline" style="margin-top:2px">체크하면 무게중심·리핸들링 제약 없이 용적률만 최대화합니다 (무게중심 편차·리핸들링이 늘 수 있음)<br>
+              계산 후 결과 화면의 가중치 슬라이더가 고를 수 있는 후보 자체가 넓어져, '용적률 최대화' 쪽 한계치가 더 올라갑니다</span>
+            </span>
+          </label>
+
+          <!-- [추가됨] 신규 물리 제약 3종 UI — clp/model.py의 Container에
+               추가한 min_support_ratio/max_stack_levels/cg_tolerance와
+               1:1로 대응. fragile은 별도 UI 없이 CSV의 fragile 컬럼으로
+               지정한다(destination/priority처럼 화물 단위 속성이라 화면의
+               전역 설정이 아님). -->
+          <div class="field" id="supportField" style="margin-top:14px">
+            <label>최소 지지면적 비율 — 낮을수록 용적률은 오르지만 안정성이 낮아집니다</label>
+            <div class="row">
+              <input type="range" id="minSupportR" min="50" max="95" step="5" value="80">
+              <span class="num" id="minSupportV">80%</span>
+            </div>
+          </div>
+
+          <div class="field" id="cgTolField" style="margin-top:14px">
+            <label>무게중심(CoG) 허용오차 — 낮을수록 더 균형 잡힌 적재를 요구합니다</label>
+            <div class="row">
+              <input type="range" id="cgTolR" min="0" max="15" step="1" value="5">
+              <span class="num" id="cgTolV">5%</span>
+            </div>
+          </div>
+
+          <div class="field" id="stackField" style="margin-top:14px">
+            <label>최대 적재 단수</label>
+            <div class="row">
+              <input type="range" id="maxStackR" min="1" max="10" step="1" value="10" disabled>
+              <span class="num" id="maxStackV">제한 없음</span>
+            </div>
+            <div class="field-check">
+              <input type="checkbox" id="stackLimitOn">
+              <span>단수 제한 사용</span>
+            </div>
+          </div>
+          </details>
+
+          <button class="btn" id="runCalc" disabled>
+            계산하기
+          </button>
+        </div>
+      </div>
+    </aside>
+
+    <section id="center">
+      <div id="tabs"></div>
+      <div id="stage">
+        <canvas id="cv"></canvas>
+        <div class="hud" id="hudTL"></div>
+        <div class="hud" id="hudBR">DRAG 회전 · WHEEL 확대</div>
+        <!-- [수정됨] 요청 D: 세로 5버튼 CAD 스타일 → 상단 좌측 가로
+             세그먼트 컨트롤. data-view로 setView()가 활성 세그먼트를
+             표시할 수 있게 한다("3D"=iso 카메라 프리셋의 화면 라벨). -->
+        <div id="viewBtns">
+          <button class="vbtn act" data-view="iso" onclick="setView('iso')" title="등각">3D</button>
+          <button class="vbtn" data-view="top" onclick="setView('top')" title="평면">TOP</button>
+          <button class="vbtn" data-view="side" onclick="setView('side')" title="측면">SIDE</button>
+          <button class="vbtn" data-view="door" onclick="setView('door')" title="문">DOOR</button>
+        </div>
+        <!-- [수정됨] 요청 24: 자주 안 쓰는 뷰포트 도구는 우측 하단에 작게 모은다.
+             Fit(컨테이너 맞춤) · Reset(기본 시점) · 전체화면. -->
+        <div id="viewTools">
+          <button class="vtool" onclick="fitContainer()" title="컨테이너 맞춤">⤢</button>
+          <button class="vtool" onclick="resetView()" title="기본 시점으로">↺</button>
+          <button class="vtool" id="btnFs" onclick="toggleFullscreen()" title="전체화면">⛶</button>
+        </div>
+        <!-- [추가됨] 요청 9/26: 3D에서 화물을 클릭하면 뜨는 상세 popover -->
+        <div id="cargoPop"></div>
+        <div id="busy">
+          <div class="busy-t" id="busyT">최적 배치를 탐색하고 있습니다</div>
+          <div class="scan"><i id="barFill"></i></div>
+          <div class="bstat">
+            <div><div class="v" id="bGen">—</div><div class="l">세대</div></div>
+            <div><div class="v" id="bUtil">—</div><div class="l">용적률</div></div>
+            <div><div class="v" id="bUlo">—</div><div class="l">ULO</div></div>
+            <div><div class="v" id="bTime">—</div><div class="l">경과</div></div>
+          </div>
+        </div>
+      </div>
+      <!-- [수정됨] 팀 피드백: 가중치 슬라이더를 3D 적재 화면 바로 아래로
+           옮겨서, 결과를 보면서 바로 옆에서 조절할 수 있게 했다
+           (예전엔 #tabs 바로 아래·#stage 위에 있었다). -->
+      <div id="weightBox"></div>
+      <div id="play" class="panel">
+        <button class="pbtn" id="btnPlay" title="재생">▶</button>
+        <input type="range" id="seek" min="0" max="0" value="0">
+        <div class="pcount" id="pcount">0 / 0</div>
+        <div class="spd">
+          <button data-s="1">1x</button>
+          <button data-s="2" class="on">2x</button>
+          <button data-s="4">4x</button>
+        </div>
+        <button class="pbtn" id="btnUnload" title="하역 시뮬레이션">⇤</button>
+      </div>
+    </section>
+
+    <aside id="right" class="panel">
+      <div id="results">
+        <!-- [수정됨] 요청 37: 화면마다 맞는 empty state + CTA 하나.
+             업로드 전/후(계산 전) 문구가 updateResultsEmpty()로 바뀐다. -->
+        <div class="empty" id="resEmpty">
+          <div class="big">▤</div>
+          <div class="et">적재 결과가 아직 없습니다</div>
+          <div class="es">화물 명세를 업로드하면<br>적재 계획을 세울 수 있습니다</div>
+        </div>
+      </div>
+    </aside>
+  </main>
+</div>
+
+<script type="importmap">
+{"imports":{"three":"https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.module.js"}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+
+let cargoId=null, contCode='20ft';
+let stowMode='floor', palletSpec='T11-100', palletCount=0;
+let calcMode='precise'; // [수정됨] 우수 프로젝트 제출용 사본: 현장 대응 카드를 숨겼으므로 기본값도 정밀 탐색으로 변경
+let result=null, curSol=0, colorBy='shipper', curJobId=null;
+// [추가됨] 가중치 슬라이더 상태. curSol이 'custom'이면 3개 프리셋 탭이 아니라
+// customSol(마지막으로 /api/reweight가 돌려준 해)이 화면에 표시 중인 것.
+let customSol=null, weightTimer=null;
+// [수정됨] 팀 피드백: 계산 전 좌측 패널의 가중치 슬라이더를 없앴으므로
+// pendingWeight/pendingWeightTouched(계산 시작 시점 값을 캡처해 두던 상태)도
+// 더는 필요 없다 — loadResult()는 항상 '최대 용적률'(pickSol(0))로 연다.
+let boxes=[], meshes=[], cont=null;
+let anim={playing:false,idx:0,speed:2,t:0,unload:false,unloadStep:0};
+let jobTimer=null, boxCount=0;
+
+const cv=document.getElementById('cv');
+const renderer=new THREE.WebGLRenderer({canvas:cv,antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+// [추가됨] 소프트 섀도우 — 각 화물이 바닥/서로에게 은은한 contact shadow를
+// 드리워 "공간을 차지하고 있다"는 입체감을 만든다(요청 20).
+renderer.shadowMap.enabled=true;
+renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0xF1F4F9);
+scene.fog=new THREE.Fog(0xF1F4F9,3200,9000);
+const camera=new THREE.PerspectiveCamera(38,1,1,20000);
+const root=new THREE.Group(); scene.add(root);
+
+// [수정됨] 요청 22: 부드러운 3점 조명. 위쪽-왼쪽 key light가 TOP면을 밝히고
+// SIDE면이 자연스럽게 어두워지도록. 컬러 림라이트/포인트라이트는 제거
+// (박스를 플라스틱처럼 번쩍이게 만들고 팔레트를 흐린다).
+// [중요] three.js r155부터 physically-correct lighting이 기본(useLegacyLights=false)
+// 이라 모든 광원 강도에 1/π(≈0.318)가 곱해진다. 요청서의 "ambient 0.7 / key 0.8 /
+// fill 0.3"은 구(legacy) 기준 수치라 그대로 쓰면 화면이 3배 이상 어두워진다
+// (실측: 흰 바닥이 RGB 174까지 떨어져 지면이 잿빛으로 보였다).
+// π 보정한 뒤 실측 스윕으로 확정한 값 — 지면 234 / 박스 윗면 214 / 옆면 175로
+// pastel 색조를 유지하면서 면 대비가 확보되는 지점이다.
+scene.add(new THREE.AmbientLight(0xffffff,1.55));
+const keyLight=new THREE.DirectionalLight(0xffffff,1.45);
+keyLight.position.set(-0.55,1,0.42); keyLight.castShadow=true;
+keyLight.shadow.mapSize.set(1536,1536);
+keyLight.shadow.bias=-0.0006;
+keyLight.shadow.normalBias=0.6;
+keyLight.shadow.radius=3;
+scene.add(keyLight);
+const fillLight=new THREE.DirectionalLight(0xffffff,.55);
+fillLight.position.set(0.8,0.45,-0.7); scene.add(fillLight);
+
+let cam={az:-0.66,el:0.44,dist:1200,tx:0,ty:0,tz:0};
+let camT={...cam};
+let drag=false,px=0,py=0;
+cv.addEventListener('pointerdown',e=>{drag=true;px=e.clientX;py=e.clientY;cv.setPointerCapture(e.pointerId)});
+cv.addEventListener('pointerup',e=>{drag=false;cv.releasePointerCapture(e.pointerId)});
+cv.addEventListener('pointermove',e=>{
+  if(!drag)return;
+  camT.az-=(e.clientX-px)*.007;
+  camT.el=Math.max(-1.25,Math.min(1.42,camT.el+(e.clientY-py)*.007));
+  px=e.clientX;py=e.clientY;
+});
+cv.addEventListener('wheel',e=>{e.preventDefault();
+  camT.dist=Math.max(180,Math.min(7000,camT.dist*(1+Math.sign(e.deltaY)*.09)))},{passive:false});
+
+/* [추가됨] 요청 23/25: 컨테이너 bounding box 기준 자동 프레이밍.
+   화물이 화면 한가운데 조그맣게 모여 보이는 문제를 없애고, 어떤 규격의
+   컨테이너를 골라도 항상 알맞은 크기로 잡히게 한다. */
+/* bounding sphere 근사는 컨테이너처럼 길쭉한 상자에서 오차가 커서(좁은
+   패널 폭에서는 양 끝이 잘리고, 넓으면 너무 작게 보인다) 실제 8개 코너를
+   현재 fov/aspect로 투영해 NDC 범위를 재고 거리를 수렴시킨다. */
+function fitView(instant,fill){
+  if(!cont)return;
+  const L=cont.L,W=cont.W,H=cont.H;
+  camT.tx=L/2; camT.ty=H*0.46; camT.tz=W/2;
+  const corners=[];
+  for(const x of [0,L])for(const y of [0,H])for(const z of [0,W])
+    corners.push(new THREE.Vector3(x,y,z));
+  const tmp=camera.clone();
+  const target=Math.max(.5,Math.min(fill||0.86,0.98));
+  let d=Math.sqrt(L*L+W*W+H*H);
+  for(let it=0;it<5;it++){
+    tmp.position.set(camT.tx+d*Math.cos(camT.el)*Math.cos(camT.az),
+                     camT.ty+d*Math.sin(camT.el),
+                     camT.tz+d*Math.cos(camT.el)*Math.sin(camT.az));
+    tmp.lookAt(camT.tx,camT.ty,camT.tz);
+    tmp.updateMatrixWorld(true); tmp.updateProjectionMatrix();
+    let m=0;
+    for(const c of corners){
+      const p=c.clone().project(tmp);
+      m=Math.max(m,Math.abs(p.x),Math.abs(p.y));
+    }
+    if(!isFinite(m)||m<1e-4)break;
+    const next=d*m/target;
+    if(Math.abs(next-d)<d*0.005){d=next;break}
+    d=next;
+  }
+  camT.dist=d;
+  if(instant){cam.tx=camT.tx;cam.ty=camT.ty;cam.tz=camT.tz;cam.dist=camT.dist}
+}
+
+window.setView=v=>{
+  if(!cont)return;
+  // 각도를 먼저 정하고 그 각도 기준으로 프레이밍한다(순서가 바뀌면 틀어진다)
+  if(v==='iso'){camT.az=-0.66;camT.el=0.42;fitView(false,0.86)}
+  if(v==='side'){camT.az=-Math.PI/2;camT.el=0.05;fitView(false,0.90)}
+  if(v==='top'){camT.az=-Math.PI/2;camT.el=1.45;fitView(false,0.90)}
+  if(v==='door'){camT.az=Math.PI;camT.el=0.10;fitView(false,0.78)}
+  // [추가됨] 세그먼트 컨트롤에서 지금 어느 뷰가 활성인지 표시.
+  document.querySelectorAll('#viewBtns .vbtn').forEach(b=>b.classList.toggle('act',b.dataset.view===v));
+};
+
+// 요청 24/25: Fit(컨테이너 전체가 들어오게) / Reset(기본 3/4 시점) 컨트롤.
+window.fitContainer=()=>{if(!cont)return;fitView(false)};
+window.resetView=()=>{clearSelection();setView('iso')};
+
+// [추가됨] 팀 피드백: 적재 화면이 작아서 보기 불편하다는 지적 — #center
+// (탭 · 가중치 슬라이더 · 3D 화면 · 재생바) 전체를 전체화면으로 띄운다.
+// #stage만 전체화면으로 하면 재생/탐색 컨트롤(#play)이 밖에 남아 조작이
+// 끊기므로, 그 컨트롤들까지 포함한 #center를 대상으로 했다.
+const centerEl=document.getElementById('center');
+window.toggleFullscreen=()=>{
+  if(!document.fullscreenElement && !document.webkitFullscreenElement){
+    (centerEl.requestFullscreen||centerEl.webkitRequestFullscreen||function(){}).call(centerEl);
+  }else{
+    (document.exitFullscreen||document.webkitExitFullscreen||function(){}).call(document);
+  }
+};
+function onFsChange(){
+  const on=!!(document.fullscreenElement||document.webkitFullscreenElement);
+  document.getElementById('btnFs')?.classList.toggle('act',on);
+  resize();
+}
+document.addEventListener('fullscreenchange',onFsChange);
+document.addEventListener('webkitfullscreenchange',onFsChange);
+
+function updCam(dt){
+  const s=Math.min(1,dt*9);
+  cam.az+=(camT.az-cam.az)*s; cam.el+=(camT.el-cam.el)*s;
+  cam.dist+=(camT.dist-cam.dist)*s;
+  cam.tx+=(camT.tx-cam.tx)*s; cam.ty+=(camT.ty-cam.ty)*s; cam.tz+=(camT.tz-cam.tz)*s;
+  const{az,el,dist,tx,ty,tz}=cam;
+  camera.position.set(tx+dist*Math.cos(el)*Math.cos(az),ty+dist*Math.sin(el),tz+dist*Math.cos(el)*Math.sin(az));
+  camera.lookAt(tx,ty,tz);
+}
+function resize(){
+  const w=cv.clientWidth,h=cv.clientHeight;
+  if(w&&h&&(cv.width!==w||cv.height!==h)){
+    renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();
+    invalidate();
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   [전면 재설계] Cargo Fit 3D graphic language
+   요청 15~22: 강한 원색 큐브 집합 → 저채도 pastel + bevel + 면별 명암 +
+   contact shadow 를 가진 "premium geometric cargo visualization".
+   좌표·치수는 packing 결과 그대로 쓰고(요청 41), 렌더링 레이어만 바꾼다.
+   ═══════════════════════════════════════════════════════════════════ */
+
+// 요청 16: 저채도 pastel 7색. 하역지 A~G가 이 순서로 고정 매핑되고,
+// 화주별/종류별 모드도 같은 팔레트를 인덱스로 돌려써서 화면 전체의
+// 색 언어가 항상 일관되게 유지된다(랜덤 색 금지).
+const CARGO_PALETTE=['#D9E7FF','#DDEFE5','#F2E2C4','#E8DDF2','#F3D9DE','#D8E8EA','#ECE6D8'];
+const DEST_BASE={A:'#D9E7FF',B:'#DDEFE5',C:'#F2E2C4',D:'#E8DDF2',E:'#F3D9DE',F:'#D8E8EA',G:'#ECE6D8'};
+const shipperIdx={};
+function shipperColor(s){
+  if(!(s in shipperIdx))shipperIdx[s]=Object.keys(shipperIdx).length;
+  return CARGO_PALETTE[shipperIdx[s]%CARGO_PALETTE.length];
+}
+function typeColor(t){return CARGO_PALETTE[t%CARGO_PALETTE.length]}
+function boxColor(b){
+  if(colorBy==='dest')return DEST_BASE[b.destination]||CARGO_PALETTE[5];
+  if(colorBy==='type')return typeColor(b.type_id);
+  return shipperColor(b.shipper);
+}
+
+// 요청 15: sharp cube 금지 — 모서리를 살짝 정리한 bevel. 치수의 약 3%를
+// bevel로 쓰되(상·하한을 둬서 아주 작은 화물이 장난감처럼 둥글어지거나
+// 큰 화물이 각져 보이지 않게), 실제 dx/dy/dz 총 치수는 그대로 유지한다.
+function roundedRectShape(w,h,r){
+  const s=new THREE.Shape(), x=-w/2, y=-h/2;
+  s.moveTo(x+r,y);
+  s.lineTo(x+w-r,y); s.quadraticCurveTo(x+w,y,x+w,y+r);
+  s.lineTo(x+w,y+h-r); s.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+  s.lineTo(x+r,y+h); s.quadraticCurveTo(x,y+h,x,y+h-r);
+  s.lineTo(x,y+r); s.quadraticCurveTo(x,y,x+r,y);
+  return s;
+}
+
+// 같은 규격의 화물이 수십 개씩 반복되므로 지오메트리를 치수 기준으로
+// 캐시한다(129개 화물 → 실제 생성은 규격 종류 수만큼). 캐시된 것은
+// disposeObject()가 지우면 안 되므로 userData.cached로 표시.
+const geoCache={};
+function cargoGeometry(dx,dy,dz){
+  const key=dx+'|'+dy+'|'+dz;
+  if(geoCache[key])return geoCache[key];
+  const b=Math.max(0.5,Math.min(Math.min(dx,dy,dz)*0.03,2.6));
+  const shape=roundedRectShape(dx-b*2,dz-b*2,b);   // XY 평면: X=폭, Y=높이
+  const depth=Math.max(0.1,dy-b*2);                 // Z 방향으로 압출 = 안쪽 깊이
+  const geo=new THREE.ExtrudeGeometry(shape,{
+    depth,bevelEnabled:true,bevelThickness:b,bevelSize:b,bevelSegments:2,
+    curveSegments:2,steps:1
+  });
+  geo.translate(0,0,-depth/2);
+  geo.computeVertexNormals();
+
+  // 요청 17: 같은 박스라도 TOP/FRONT/SIDE의 밝기를 다르게 — 조명에만
+  // 의존하지 않고 면 방향에 따른 명암을 vertex color로 구워 넣는다.
+  // (material.color × vertexColor 로 곱해지므로 어떤 pastel 색에도
+  //  동일한 비율로 적용되고, bevel 면에서는 값이 부드럽게 보간된다)
+  const nor=geo.attributes.normal, n=geo.attributes.position.count;
+  const col=new Float32Array(n*3);
+  for(let i=0;i<n;i++){
+    const nx=nor.getX(i),ny=nor.getY(i),nz=nor.getZ(i);
+    const f=1+0.11*Math.max(0,ny)-0.17*Math.max(0,-ny)
+             -0.09*Math.abs(nx)-0.14*Math.abs(nz);
+    col[i*3]=col[i*3+1]=col[i*3+2]=f;
+  }
+  geo.setAttribute('color',new THREE.BufferAttribute(col,3));
+  geo.userData.cached=true;
+  geoCache[key]=geo;
+  return geo;
+}
+
+// 요청 19: 박스 표면에 큰 글자를 직접 그리지 않고, 작은 label plane을
+// 윗면에 얹는다. 텍스트는 최소한(화주 + 하역지)만.
+const texCache={};
+function labelTexture(l1,l2){
+  const key=l1+'|'+l2;
+  if(texCache[key])return texCache[key];
+  const W=256,H=112,c=document.createElement('canvas');
+  c.width=W;c.height=H;
+  const g=c.getContext('2d');
+  g.clearRect(0,0,W,H);
+  g.fillStyle='rgba(248,250,252,.90)';
+  const r=18;
+  g.beginPath();
+  g.moveTo(r,0);g.arcTo(W,0,W,H,r);g.arcTo(W,H,0,H,r);g.arcTo(0,H,0,0,r);g.arcTo(0,0,W,0,r);
+  g.closePath();g.fill();
+  g.strokeStyle='rgba(17,24,39,.10)';g.lineWidth=3;g.stroke();
+  g.fillStyle='#111827';g.font='700 46px "IBM Plex Mono",monospace';
+  g.textBaseline='middle';g.fillText(l1,20,H/2);
+  g.fillStyle='#667085';g.font='600 30px "IBM Plex Mono",monospace';
+  g.textAlign='right';g.fillText(l2,W-20,H/2+2);
+  const t=new THREE.CanvasTexture(c);
+  t.anisotropy=4; t.userData.cached=true;
+  texCache[key]=t; return t;
+}
+
+// 요청 21: CAD 눈금자 느낌의 바닥을 버리고, 대비가 아주 낮은 미세 그리드만.
+function floorTexture(L,W){
+  const c=document.createElement('canvas');
+  c.width=1024; c.height=Math.max(64,Math.round(1024*W/L));
+  const g=c.getContext('2d');
+  g.fillStyle='#E9EEF5'; g.fillRect(0,0,c.width,c.height);
+  const step=50, px=step/L*c.width;
+  g.strokeStyle='rgba(203,213,225,.85)'; g.lineWidth=1;
+  for(let x=0;x<=c.width;x+=px){g.beginPath();g.moveTo(x,0);g.lineTo(x,c.height);g.stroke()}
+  for(let y=0;y<=c.height;y+=px){g.beginPath();g.moveTo(0,y);g.lineTo(c.width,y);g.stroke()}
+  g.strokeStyle='rgba(148,163,184,.55)'; g.lineWidth=2;
+  for(let x=0;x<=c.width;x+=px*2){g.beginPath();g.moveTo(x,0);g.lineTo(x,c.height);g.stroke()}
+  const t=new THREE.CanvasTexture(c);
+  t.anisotropy=4;
+  return t;
+}
+
+/*
+ * [추가됨] buildScene()은 해(solution) 탭 전환, 화물 구분(화주별/하역지별/
+ * 종류별) 토글마다 매번 다시 불린다. 예전엔 root.remove(o)만 하고 끝냈는데,
+ * three.js는 remove()로 씬 그래프에서만 뺄 뿐 GPU에 올라간 지오메트리·머티리얼
+ * 버퍼는 dispose()를 직접 호출해야 해제된다. 계속 안 지우고 새로 만들기만
+ * 하면(박스마다 BoxGeometry+MeshLambertMaterial+EdgesGeometry+LineBasicMaterial
+ * 이 매번 새로) GPU 리소스가 쌓이다가, 한도를 넘는 순간부터 새 텍스처/셰이더
+ * 바인딩이 조용히 실패해서 박스가 (질감 없이) 검게 나온다 — 몇 번 조작한
+ * 뒤에만 재현되는 게 특징이라 이 리소스 누적이 원인이라는 신호다.
+ * 박스 라벨 텍스처(texCache)는 재사용을 위해 일부러 캐시해둔 것이므로
+ * (같은 색상·화주·하역지·적재가능여부 조합이면 재활용) 여기서 같이
+ * 지우면 안 된다 — labelTexture()/cargoGeometry()가 캐시본에 표시해 둔
+ * userData.cached로 구분해서 건너뛴다.
+ */
+function disposeObject(o){
+  // [수정됨] 지오메트리도 규격 단위로 캐시(cargoGeometry)하게 되면서,
+  // 텍스처와 같은 이유로 캐시된 것은 여기서 지우면 안 된다 —
+  // 지우면 다음 buildScene()에서 빈 버퍼를 참조해 박스가 사라진다.
+  if(o.geometry&&!o.geometry.userData?.cached)o.geometry.dispose();
+  if(o.material){
+    const mats=Array.isArray(o.material)?o.material:[o.material];
+    mats.forEach(m=>{
+      if(m.map&&!m.map.userData?.cached)m.map.dispose();
+      m.dispose();
+    });
+  }
+  o.children.forEach(disposeObject);
+}
+
+/* [전면 재설계] 요청 21: 컨테이너를 와이어프레임이 아니라 "공간"으로.
+   벽은 BackSide로 그려서 카메라 쪽 벽은 자동으로 컬링되고 항상 안이
+   들여다보이게 한다(열린 상자처럼). 바닥은 저대비 그리드, 테두리는
+   가느다란 실루엣 라인만. */
+function buildScene(){
+  // 씬을 다시 만들면 기존 선택 메쉬는 폐기되므로 선택 상태부터 해제한다.
+  selMesh=null;
+  document.getElementById('cargoPop')?.classList.remove('on');
+  while(root.children.length){
+    const o=root.children[0];
+    disposeObject(o);
+    root.remove(o);
+  }
+  meshes=[]; prevShown=0;
+  if(!cont)return;
+  const L=cont.L,W=cont.W,H=cont.H;
+
+  // 바닥 — 그림자를 받는 면
+  const fl=new THREE.Mesh(new THREE.PlaneGeometry(L,W),
+    new THREE.MeshLambertMaterial({map:floorTexture(L,W)}));
+  fl.rotation.x=-Math.PI/2; fl.position.set(L/2,0,W/2);
+  fl.receiveShadow=true; root.add(fl);
+
+  // 컨테이너 바깥으로 이어지는 옅은 지면. [수정됨] MeshBasicMaterial은
+  // 조명·그림자를 아예 무시해서 contact shadow가 하나도 안 찍혔다 —
+  // Lambert + receiveShadow로 바꿔야 화물이 바닥에 "놓여 있는" 느낌이 난다.
+  const gl=new THREE.Mesh(new THREE.PlaneGeometry(L*1.7,W*3.0),
+    new THREE.MeshLambertMaterial({color:0xEDF1F7}));
+  gl.rotation.x=-Math.PI/2; gl.position.set(L/2,-6,W/2);
+  gl.receiveShadow=true; root.add(gl);
+
+  // 벽/천장 — BackSide라서 카메라를 향한 면은 보이지 않는다
+  const shell=new THREE.Mesh(new THREE.BoxGeometry(L,H,W),
+    new THREE.MeshLambertMaterial({color:0xDCE4EE,transparent:true,opacity:.22,
+      side:THREE.BackSide,depthWrite:false}));
+  shell.position.set(L/2,H/2,W/2); root.add(shell);
+
+  // 실루엣 라인 — 파란 형광 테두리 대신 가는 중성 회색
+  const edges=new THREE.LineSegments(
+    new THREE.EdgesGeometry(new THREE.BoxGeometry(L,H,W)),
+    new THREE.LineBasicMaterial({color:0x94A3B8,transparent:true,opacity:.55}));
+  edges.position.set(L/2,H/2,W/2); root.add(edges);
+
+  // 문(하역구) 표시 — x=0 면에 아주 옅은 primary tint
+  const dr=new THREE.Mesh(new THREE.PlaneGeometry(W,H),
+    new THREE.MeshBasicMaterial({color:0x2563EB,transparent:true,opacity:.055,
+      side:THREE.DoubleSide,depthWrite:false}));
+  dr.rotation.y=Math.PI/2; dr.position.set(0.5,H/2,W/2); root.add(dr);
+
+  // key light의 그림자 절두체를 컨테이너 크기에 맞춘다
+  const span=Math.max(L,W,H)*0.8;
+  keyLight.position.set(L/2-span*0.7,H+span*1.2,W/2+span*0.55);
+  keyLight.target.position.set(L/2,0,W/2);
+  scene.add(keyLight.target);
+  // [중요] shadow camera 절두체는 그림자를 "받는" 지면 전체를 덮어야 한다.
+  // 절두체 밖 영역은 shadow map 가장자리 값이 클램프되면서 지면이 통째로
+  // 그늘진 것처럼 시커멓게 보이는 아티팩트가 생긴다(실측으로 확인).
+  const sc=keyLight.shadow.camera;
+  sc.left=-span*1.9; sc.right=span*1.9; sc.top=span*1.9; sc.bottom=-span*1.9;
+  sc.near=1; sc.far=span*6; sc.updateProjectionMatrix();
+
+  meshes=buildBoxMeshes(boxes);
+
+  fitView(true);
+  showUpTo(boxes.length);
+  updHUD();
+  invalidate();
+}
+
+// [추가됨] buildScene()에서 박스 메쉬 생성부만 떼어낸 헬퍼. 가중치 슬라이더로
+// 해가 바뀔 때 컨테이너는 그대로 두고 박스만 부드럽게 전환하기 위해 분리.
+function buildBoxMeshes(arr){
+  const out=[];
+  arr.forEach(b=>{
+    const hex=boxColor(b);
+    const geo=cargoGeometry(b.dx,b.dy,b.dz);
+    const mat=new THREE.MeshLambertMaterial({color:hex,vertexColors:true});
+    const mesh=new THREE.Mesh(geo,mat);
+    mesh.position.set(b.x+b.dx/2,b.z+b.dz/2,b.y+b.dy/2);
+    mesh.castShadow=true; mesh.receiveShadow=true;
+    mesh.visible=false;
+    mesh.userData={base:new THREE.Color(hex),box:b,appear:0,sel:false,
+      baseY:b.z+b.dz/2};
+
+    // 요청 19: 큰 화물에만 윗면 label plane. 작은 화물은 생략해서
+    // 화면이 글자로 뒤덮이지 않게 한다(선택 시에는 별도로 표시).
+    if(b.dx>=45&&b.dy>=32){
+      const lp=makeLabelPlane(b);
+      lp.material.depthTest=true;   // 상시 라벨은 다른 화물에 가려지는 게 자연스럽다
+      lp.renderOrder=2;
+      mesh.add(lp);
+      mesh.userData.label=lp;
+    }
+    root.add(mesh); out.push(mesh);
+  });
+  return out;
+}
+
+function updHUD(){
+  if(!cont)return;
+  document.getElementById('hudTL').innerHTML=
+    '<div class="chip">규격 <b>'+cont.L+'×'+cont.W+'×'+cont.H+' cm</b></div>'+
+    '<div class="chip">화물 <b>'+boxes.length+'</b></div>'+
+    (activeSol()?'<div class="chip">'+activeSol().label+'</div>':'');
+}
+
+// [수정됨] 박스가 텍스처가 아니라 단색 pastel + vertex color 명암으로
+// 바뀌었으므로, 하이라이트는 map 교체가 아니라 색상 교체로 처리한다.
+function paint(m,hex){
+  m.material.color.set(hex!=null?hex:m.userData.base);
+  if(m.userData.sel){
+    // 요청 26: 두꺼운 아웃라인 대신 "약간 밝게 + subtle blue glow"
+    m.material.color.lerp(new THREE.Color(0xffffff),0.18);
+    m.material.emissive.setHex(0x2563EB);
+    m.material.emissiveIntensity=.42;
+  }else{
+    m.material.emissive.setHex(0x000000);
+  }
+}
+
+// 선택된 화물에는 라벨이 없더라도 라벨을 띄운다(요청 26: label 활성화).
+function makeLabelPlane(b){
+  const lw=Math.max(34,Math.min(b.dx*0.66,64)), lh=lw*0.44;
+  const lp=new THREE.Mesh(new THREE.PlaneGeometry(lw,lh),
+    new THREE.MeshBasicMaterial({map:labelTexture(b.shipper,'DEST '+b.destination),
+      transparent:true,depthWrite:false,depthTest:false}));
+  // 평면을 그냥 눕히면(rotation.x=-90°) 텍스트의 up 방향이 카메라 쪽(-Z)을
+  // 향해 글자가 180° 뒤집혀 보인다. Euler XYZ에서 Rz가 먼저 적용되므로
+  // z=180°를 함께 줘서 평면 안에서 글자를 돌려놓는다.
+  lp.rotation.set(-Math.PI/2,0,Math.PI);
+  lp.position.set(0,b.dz/2+0.6,0);
+  lp.renderOrder=3;
+  return lp;
+}
+
+/* [추가됨] 요청 26: 화물 선택 — 3D에서 클릭하면 subtle blue glow + 살짝
+   밝게 + label 표시, 그리고 상세 정보를 compact popover로 띄운다.
+   두꺼운 파란 아웃라인은 쓰지 않는다. */
+let selMesh=null;
+function clearSelection(){
+  if(selMesh){
+    selMesh.userData.sel=false; paint(selMesh,null);
+    if(selMesh.userData.labelAdded){       // 선택 때 임시로 붙였던 라벨만 제거
+      selMesh.remove(selMesh.userData.label);
+      disposeObject(selMesh.userData.label);
+      selMesh.userData.label=null; selMesh.userData.labelAdded=false;
+    }
+  }
+  selMesh=null;
+  const p=document.getElementById('cargoPop'); if(p)p.classList.remove('on');
+  invalidate();
+}
+window.clearSelection=clearSelection;
+function selectMesh(m){
+  if(selMesh===m){clearSelection();return}
+  clearSelection();
+  selMesh=m; m.userData.sel=true; paint(m,null);
+  const b=m.userData.box;
+  if(!m.userData.label){                    // 라벨이 없던 작은 화물이면 임시로 붙인다
+    const lp=makeLabelPlane(b);
+    m.add(lp); m.userData.label=lp; m.userData.labelAdded=true;
+  }
+  const p=document.getElementById('cargoPop');
+  if(p){
+    p.innerHTML=
+      '<div class="cp-h"><b>'+b.shipper+'</b><span>ID '+b.box_id+'</span>'+
+      '<button class="cp-x" onclick="clearSelection()">✕</button></div>'+
+      '<div class="cp-row"><span>하역지</span><b>'+b.destination+' · '+b.priority+'번째</b></div>'+
+      '<div class="cp-row"><span>치수</span><b>'+Math.round(b.dx)+'×'+Math.round(b.dy)+'×'+Math.round(b.dz)+' cm</b></div>'+
+      '<div class="cp-row"><span>중량</span><b>'+b.weight+' kg</b></div>'+
+      '<div class="cp-row"><span>위치</span><b>'+Math.round(b.x)+', '+Math.round(b.y)+', '+Math.round(b.z)+'</b></div>'+
+      '<div class="cp-row"><span>적재 단수</span><b>'+((b.stack_level??0)+1)+'단</b></div>'+
+      '<div class="cp-row"><span>적재 순서</span><b>'+(b.seq+1)+' / '+boxes.length+'</b></div>'+
+      (b.fragile?'<div class="cp-tag">파손주의 · 위에 적재 불가</div>':
+        (b.stackable===0?'<div class="cp-tag">위에 적재 불가</div>':''));
+    p.classList.add('on');
+  }
+  invalidate();
+}
+const ray=new THREE.Raycaster(), ptr=new THREE.Vector2();
+let downXY=null;
+cv.addEventListener('pointerdown',e=>{downXY=[e.clientX,e.clientY]});
+cv.addEventListener('click',e=>{
+  // 드래그(회전)와 클릭(선택)을 구분 — 5px 이상 움직였으면 회전으로 본다
+  if(downXY&&Math.hypot(e.clientX-downXY[0],e.clientY-downXY[1])>5)return;
+  const r=cv.getBoundingClientRect();
+  ptr.x=((e.clientX-r.left)/r.width)*2-1;
+  ptr.y=-((e.clientY-r.top)/r.height)*2+1;
+  ray.setFromCamera(ptr,camera);
+  const hit=ray.intersectObjects(meshes.filter(m=>m.visible),false)[0];
+  if(hit)selectMesh(hit.object); else clearSelection();
+});
+
+let prevShown=0;
+function showUpTo(n){
+  // 요청 33: 적재 재생 중 새로 나타나는 화물은 살짝 위에서 내려앉으며
+  // 페이드인(ease-out). 한 번에 여러 개가 튀어나오는 경우(해 전환·전체
+  // 표시)에는 애니메이션을 걸지 않는다.
+  const animate=n>prevShown&&n-prevShown<=4;
+  const now=performance.now();
+  meshes.forEach((m,i)=>{
+    const vis=i<n;
+    if(vis&&!m.visible&&animate)m.userData.appear=now;
+    if(!vis)m.userData.appear=0;
+    m.visible=vis;
+    if(!m.userData.appear){m.material.transparent=false;m.material.opacity=1;
+      m.position.y=m.userData.baseY;}
+    paint(m,null);
+  });
+  prevShown=n;
+  anim.idx=n;
+  document.getElementById('seek').value=n;
+  document.getElementById('pcount').textContent=n+' / '+boxes.length;
+  invalidate();
+}
+
+// [추가됨] 가중치 슬라이더/버튼이나 프리셋 탭으로 해가 바뀔 때, 화면이 갑자기
+// 다른 배치로 훅 바뀌면 부자연스럽다는 피드백을 반영해 아래 재생(seek) 슬라이더와
+// 같은 방식 — 박스를 순서대로 하나씩 보여주고 지우는 방식 — 으로 부드럽게
+// 전환한다. 두 해는 배치 자체가 완전히 다르므로 박스를 이동시켜 모핑하는 대신,
+// 기존 배치를 순서대로 내리고(하역) 새 배치를 순서대로 쌓는(적재) 2단계
+// 애니메이션으로 표현하고, 용적률 숫자도 그 진행률에 맞춰 함께 움직인다.
+let xfade=null;
+function easeOutCubic(t){return 1-Math.pow(1-t,3)}
+
+function setVisibleCount(arr,n){
+  invalidate();
+  arr.forEach((m,i)=>{
+    m.visible=i<n;
+    if(m.visible){m.material.transparent=false;m.material.opacity=1;paint(m,null)}
+  });
+}
+function disposeMeshArray(arr){
+  arr.forEach(m=>{disposeObject(m);root.remove(m)});
+}
+function updateHeroPct(v){
+  const el=document.querySelector('#results .hero .v');
+  if(el)el.innerHTML=v.toFixed(2)+'<span style="font-size:26px">%</span>';
+}
+// 전환 도중 재생/탐색/하역 버튼 등 다른 조작이 끼어들면, 진행 중이던 전환을
+// 그 자리에서 끊지 않고 목표 상태로 즉시 마무리한 뒤 새 조작을 받는다.
+function finishXfade(){
+  if(!xfade)return;
+  if(!xfade.outDone)disposeMeshArray(xfade.fromMeshes);
+  meshes=xfade.toMeshes; boxes=xfade.toBoxes;
+  document.getElementById('seek').max=boxes.length;
+  showUpTo(boxes.length);
+  renderKPI(xfade.sol);
+  updHUD();
+  xfade=null;
+}
+
+// pickSol/applyWeight가 공통으로 쓰는 진입점. 처음 결과가 열릴 때(아직 씬이
+// 없을 때)는 즉시 그리고, 이미 박스가 떠 있는 상태에서 해만 바뀔 때는 위
+// 전환 애니메이션을 시작한다.
+// 전환 애니메이션 중에도 하단 재생 바(seek)가 지금 실제로 보이는 박스 개수를
+// 그대로 따라가도록 — "92/92"처럼 멈춰 있으면 숫자만 바뀌고 장면은 아직
+// 채워지는 중인 것처럼 보여 어색하다.
+function syncSeekUI(n,total){
+  const seekEl=document.getElementById('seek');
+  seekEl.max=total; seekEl.value=n;
+  document.getElementById('pcount').textContent=n+' / '+total;
+}
+
+function switchSolution(sol){
+  stopPlay(); anim.unload=false; anim.unloadStep=0;
+  document.getElementById('btnUnload').classList.remove('act');
+  if(xfade)finishXfade();
+
+  if(!cont||!meshes.length){
+    boxes=sol.placements;
+    document.getElementById('seek').max=boxes.length;
+    buildScene();
+    renderKPI(sol);
+    return;
+  }
+
+  const heroEl=document.querySelector('#results .hero .v');
+  const fromUtil=heroEl?parseFloat(heroEl.textContent)||0:0;
+  xfade={
+    fromMeshes:meshes,
+    toMeshes:buildBoxMeshes(sol.placements),
+    toBoxes:sol.placements, sol,
+    fromUtil, toUtil:sol.metrics.utilization,
+    start:performance.now(), outDur:280, inDur:380, outDone:false,
+  };
+}
+
+function unloadFrame(step){
+  const order=boxes.map((b,i)=>({b,i}))
+    .sort((p,q)=>p.b.priority-q.b.priority||p.b.x-q.b.x);
+  const removed=new Set(order.slice(0,step).map(o=>o.i));
+  const target=order[step];
+  const blockers=new Set();
+  if(target){
+    boxes.forEach((b,i)=>{
+      if(removed.has(i)||i===target.i)return;
+      if(b.priority>target.b.priority&&(b.x<target.b.x-1e-6||b.z>target.b.z+1e-6))blockers.add(i);
+    });
+  }
+  meshes.forEach((m,i)=>{
+    if(removed.has(i)){m.visible=false;return}
+    m.visible=true;
+    if(blockers.has(i)){paint(m,0xDC2626);m.material.transparent=false;m.material.opacity=1}
+    else if(target&&i===target.i){paint(m,0xF59E0B);m.material.transparent=false;m.material.opacity=1}
+    else{paint(m,null);m.material.transparent=true;m.material.opacity=.16}
+  });
+  document.getElementById('pcount').textContent=step+' / '+boxes.length+' 하역';
+  invalidate();
+}
+
+// [추가됨] 요청 33: 화물이 "배치되는 과정"처럼 보이도록 하는 등장 애니메이션.
+// 약 320ms ease-out으로 살짝 위에서 내려앉으며 페이드인한다(튀는 모션 금지).
+const APPEAR_MS=320;
+function tickAppear(now){
+  for(let i=0;i<meshes.length;i++){
+    const m=meshes[i], t0=m.userData.appear;
+    if(!t0)continue;
+    const p=(now-t0)/APPEAR_MS;
+    if(p>=1){
+      m.userData.appear=0;
+      m.position.y=m.userData.baseY;
+      m.material.transparent=false; m.material.opacity=1;
+      continue;
+    }
+    const e=easeOutCubic(Math.max(0,p));
+    m.position.y=m.userData.baseY+(1-e)*Math.max(12,m.userData.box.dz*0.5);
+    m.material.transparent=true;
+    m.material.opacity=e;
+  }
+}
+
+// 카메라 이동/애니메이션이 아닌 이유(가시성·색상·선택 변경 등)로 다시 그려야
+// 할 때 호출한다.
+let needsRender=true;
+function invalidate(){needsRender=true}
+
+let last=performance.now();
+function loop(now){
+  const dt=Math.min(.05,(now-last)/1000); last=now;
+  resize(); updCam(dt); tickAppear(now);
+  if(xfade){
+    const el=now-xfade.start;
+    if(el<xfade.outDur){
+      const p=easeOutCubic(el/xfade.outDur);
+      const n=Math.round((1-p)*xfade.fromMeshes.length);
+      setVisibleCount(xfade.fromMeshes,n);
+      syncSeekUI(n,xfade.fromMeshes.length);
+      updateHeroPct(xfade.fromUtil*(1-p));
+    }else{
+      if(!xfade.outDone){disposeMeshArray(xfade.fromMeshes);xfade.outDone=true}
+      const p2=easeOutCubic(Math.min(1,(el-xfade.outDur)/xfade.inDur));
+      const n2=Math.round(p2*xfade.toMeshes.length);
+      setVisibleCount(xfade.toMeshes,n2);
+      syncSeekUI(n2,xfade.toMeshes.length);
+      updateHeroPct(xfade.toUtil*p2);
+      if(el-xfade.outDur>=xfade.inDur){
+        meshes=xfade.toMeshes; boxes=xfade.toBoxes;
+        document.getElementById('seek').max=boxes.length;
+        showUpTo(boxes.length);
+        renderKPI(xfade.sol);
+        updHUD();
+        xfade=null;
+      }
+    }
+  }
+  if(anim.playing){
+    anim.t+=dt*anim.speed*14;
+    if(anim.t>=1){
+      const adv=Math.floor(anim.t); anim.t-=adv;
+      if(anim.unload){
+        anim.unloadStep=Math.min(anim.unloadStep+adv,boxes.length);
+        unloadFrame(anim.unloadStep);
+        if(anim.unloadStep>=boxes.length)stopPlay();
+      }else{
+        showUpTo(Math.min(anim.idx+adv,boxes.length));
+        if(anim.idx>=boxes.length)stopPlay();
+      }
+    }
+  }
+  /* [추가됨] on-demand 렌더링 — 화면에 변화가 없으면 렌더를 건너뛴다.
+     렌더를 건너뛰면 그림자 맵 재생성(캐스터 100여 개를 광원 시점에서 다시
+     그리는 비용)도 함께 생략되어, 정지 상태에서 GPU/CPU 사용이 사실상 0이
+     된다(실측: 결과 화면 15fps → 아래 참조). 카메라가 움직이는 중이거나
+     전환/등장 애니메이션·재생 중이면 계속 그린다. */
+  const moving=Math.abs(cam.az-camT.az)>1e-4||Math.abs(cam.el-camT.el)>1e-4||
+    Math.abs(cam.dist-camT.dist)>0.05||Math.abs(cam.tx-camT.tx)>0.05||
+    Math.abs(cam.ty-camT.ty)>0.05||Math.abs(cam.tz-camT.tz)>0.05;
+  let appearing=false;
+  for(let i=0;i<meshes.length;i++)if(meshes[i].userData.appear){appearing=true;break}
+  if(needsRender||moving||appearing||xfade||anim.playing){
+    renderer.render(scene,camera);
+    needsRender=false;
+  }
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+const btnPlay=document.getElementById('btnPlay');
+const seek=document.getElementById('seek');
+function stopPlay(){anim.playing=false;btnPlay.textContent='▶';btnPlay.classList.remove('act')}
+btnPlay.onclick=()=>{
+  if(!boxes.length)return;
+  finishXfade();
+  if(anim.playing){stopPlay();return}
+  if(anim.unload){if(anim.unloadStep>=boxes.length)anim.unloadStep=0}
+  else if(anim.idx>=boxes.length)showUpTo(0);
+  anim.playing=true;btnPlay.textContent='❚❚';btnPlay.classList.add('act');
+};
+seek.oninput=()=>{
+  finishXfade();
+  stopPlay(); anim.unload=false;
+  document.getElementById('btnUnload').classList.remove('act');
+  showUpTo(+seek.value);
+};
+document.querySelectorAll('.spd button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('.spd button').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on'); anim.speed=+b.dataset.s;
+});
+document.getElementById('btnUnload').onclick=function(){
+  if(!boxes.length)return;
+  finishXfade();
+  anim.unload=!anim.unload; stopPlay();
+  this.classList.toggle('act',anim.unload);
+  if(anim.unload){anim.unloadStep=0;unloadFrame(0);setView('door')}
+  else{showUpTo(boxes.length);setView('iso')}
+};
+
+window.toggleLeft=()=>document.getElementById('left').classList.toggle('collapsed');
+
+/* [추가됨] 요청 36: 단계 상태를 한 곳에서 관리한다.
+   1 화물 등록 → 2 계획 수립 → 3 검토. 선행 데이터가 없는 단계는 잠근다
+   (CSV 없으면 02, 계산 결과 없으면 03). */
+let curStep=1;
+function setStepUI(n){
+  curStep=n;
+  for(let i=1;i<=3;i++){
+    const el=document.getElementById('s'+i);
+    if(!el)continue;
+    el.classList.toggle('on',i===n);
+    const unlocked = i===1 || (i===2&&!!cargoId) || (i===3&&!!result);
+    el.classList.toggle('locked',!unlocked);
+  }
+}
+window.gotoStep=n=>{
+  if(n===2&&!cargoId)return;          // CSV 없으면 이동 불가
+  if(n===3&&!result)return;           // 계산 결과 없으면 이동 불가
+  if(n===1){
+    document.body.classList.add('pre-upload');
+  }else{
+    document.body.classList.remove('pre-upload');
+    // 02는 설정을 만지는 단계라 좌측 패널을 펴고, 03은 3D에 집중하도록 접는다
+    document.getElementById('left').classList.toggle('collapsed',n===3);
+  }
+  setStepUI(n);
+};
+
+const genR=document.getElementById('genR');
+function updHint(){
+  document.getElementById('genV').textContent=genR.value;
+  const n=(stowMode==='pallet'&&palletCount)?palletCount:boxCount;
+  const sec=Math.max(1,Math.round(n*0.9*(+genR.value)/30));
+  const t=sec<60?('약 '+sec+'초'):('약 '+Math.round(sec/60)+'분');
+  document.getElementById('timeHint').textContent=
+    n?('예상 소요 '+t+' · '+(stowMode==='pallet'?('팔레트 '+n+'개'):('화물 '+n+'개'))):'예상 소요 약 1분';
+}
+genR.oninput=updHint;
+
+// [수정됨] 팀 피드백: 계산 전 가중치 슬라이더(weightR)를 없앴으므로
+// weightTouched/updWeightHint도 함께 제거 — 가중치 조절은 이제 계산 후
+// 결과 화면(#weightBox)의 슬라이더에서만 한다.
+
+// [추가됨] 신규 물리 제약 3종(지지율/CoG 허용오차/최대 적재 단수) 슬라이더 —
+// genR과 같은 패턴으로 실시간 라벨만 갱신하고, 실제 전송은 runOptimization()에서.
+const minSupportR=document.getElementById('minSupportR');
+minSupportR.oninput=()=>document.getElementById('minSupportV').textContent=minSupportR.value+'%';
+const cgTolR=document.getElementById('cgTolR');
+cgTolR.oninput=()=>document.getElementById('cgTolV').textContent=cgTolR.value+'%';
+const maxStackR=document.getElementById('maxStackR'), stackLimitOn=document.getElementById('stackLimitOn');
+function updStackLabel(){
+  document.getElementById('maxStackV').textContent=stackLimitOn.checked?(maxStackR.value+'단'):'제한 없음';
+}
+maxStackR.oninput=updStackLabel;
+stackLimitOn.onchange=()=>{maxStackR.disabled=!stackLimitOn.checked;updStackLabel()};
+
+const drop=document.getElementById('drop'),fileInput=document.getElementById('file');
+drop.onclick=()=>fileInput.click();
+drop.ondragover=e=>{e.preventDefault();drop.classList.add('over')};
+drop.ondragleave=()=>drop.classList.remove('over');
+drop.ondrop=e=>{e.preventDefault();drop.classList.remove('over');
+  if(e.dataTransfer.files[0])upload(e.dataTransfer.files[0])};
+fileInput.onchange=e=>{if(e.target.files[0])upload(e.target.files[0])};
+
+async function upload(f){
+  const fd=new FormData(); fd.append('file',f);
+  drop.innerHTML='<div class="t">읽는 중…</div>';
+  try{
+    const r=await fetch('/api/upload',{method:'POST',body:fd});
+    if(!r.ok){
+      const contentType = r.headers.get("content-type");
+      if (contentType && contentType.includes("application/json")) {
+        const e = await r.json();
+        throw new Error(e.detail || '업로드 실패 (상태 코드: ' + r.status + ')');
+      } else {
+        throw new Error('서버 통신 에러 (상태 코드: ' + r.status + ')');
+      }
+    }
+    const d=await r.json();
+    cargoId=d.cargo_id; boxCount=d.summary.box_count;
+    // [추가됨] 요청 B: 업로드 성공 → Empty State를 벗어나 실제 작업 화면으로.
+    document.body.classList.remove('pre-upload');
+    drop.classList.add('has');
+    drop.innerHTML='<div class="t">'+d.filename+'</div><div class="s">'+
+      d.summary.box_count+'개 화물 · '+Object.keys(d.summary.shippers).length+'개 화주</div>';
+    document.getElementById('railText').textContent=d.filename;
+
+    const s=d.summary,c=d.container;
+    const sum=document.getElementById('summary');
+    sum.style.display='block';
+
+    // [수정됨] 요청 C: 화주별 개수를 실제 리스트로 보여준다(이전엔 개수만
+    // 세고 목록은 없었음). 타입별 치수 상세는 기본 접힘 <details>로 옮겨
+    // "선택한 화물의 상세 정보는 별도 영역에서" 보이게 했다 — 새 JS 토글
+    // 코드 없이 네이티브 <details>로 처리.
+    const shipperRows=Object.entries(s.shippers).sort().map(([name,n])=>
+      '<div class="kv"><span class="k">'+name+'</span><span class="v">'+n+'개</span></div>').join('');
+    const typeRows=Object.entries(s.types_detail||{}).map(([t,info])=>
+      '<div class="kv"><span class="k">타입 '+t+' ('+info.l+'×'+info.w+'×'+info.h+')</span>'+
+      '<span class="v">'+info.count+'개</span></div>').join('');
+
+    // 요청 9: 화물 목록에 검색. 화주가 많아지면 스크롤만으로는 못 찾으므로
+    // 간단한 필터를 둔다(입력은 화주명 기준, 대소문자 무시).
+    sum.innerHTML=
+      '<div class="hintline" style="margin-bottom:9px">'+s.box_count+'개 화물 · '+c.cargo_cbm+
+      ' CBM · '+(c.cargo_weight_kg/1000).toFixed(1)+' t</div>'+
+      '<input class="cargo-search" id="cargoSearch" placeholder="화주 검색" '+
+      'oninput="filterCargoList(this.value)">'+
+      '<div id="cargoRows">'+shipperRows+'</div>'+
+      '<details style="margin-top:10px">'+
+      '<summary style="cursor:pointer;font-size:12px;color:var(--ink-2);font-weight:600">'+
+      '상세 보기 · 규격 '+s.type_count+'종 · 하역지 '+Object.keys(s.destinations).join('/')+'</summary>'+
+      '<div style="margin-top:8px">'+typeRows+'</div></details>';
+
+    contCode=c.recommended;
+    contOptions=c.options||[];
+    previewContainer();     // [추가됨] 업로드 직후 추천 컨테이너를 3D로 미리 보여준다
+    document.getElementById('secBox').style.display='block';
+    document.getElementById('conts').innerHTML=c.options.map(o=>
+      '<div class="opt '+(o.code===contCode?'sel':'')+'" data-c="'+o.code+'" onclick="pickCont(\''+o.code+'\')">'+
+      '<div class="dot"></div><div class="body"><div class="t">'+o.label+'</div>'+
+      '<div class="s">'+o.volume_cbm+' CBM · 화물 '+o.fill_ratio+'%</div></div>'+
+      (o.code===c.recommended?'<div class="badge">추천</div>':'')+'</div>').join('');
+
+    document.getElementById('secStow').style.display='block';
+    document.getElementById('floorNote').textContent='화물 '+d.summary.box_count+'개 개별 배치';
+    document.getElementById('secMode').style.display='block';
+    
+    // 버튼 잠금 해제
+    document.getElementById('runCalc').disabled=false;
+    setStepUI(2);
+    // [추가됨] 요청 37: 업로드 후에는 "계산을 실행하세요"로 CTA를 바꾼다
+    const re=document.getElementById('resEmpty');
+    if(re)re.innerHTML='<div class="big">◱</div>'+
+      '<div class="et">계산을 실행하세요</div>'+
+      '<div class="es">좌측에서 컨테이너와 적재 방식을 고른 뒤<br>'+
+      '<b>계산하기</b>를 누르면 적재안이 만들어집니다</div>';
+    updHint();
+  }catch(err){
+    drop.classList.remove('has');
+    drop.innerHTML='<div class="t" style="color:var(--rose)">'+err.message+'</div>'+
+      '<div class="s">다시 시도하려면 클릭하세요</div>';
+  }
+}
+// [추가됨] 요청 8: CSV 템플릿 — parse_csv()가 실제로 읽는 컬럼과 정확히
+// 같은 헤더 + 예시 2행. 서버 엔드포인트 추가 없이 Blob으로 내려받는다.
+window.downloadTemplate=()=>{
+  const csv='box_id,type_id,length_cm,width_cm,height_cm,weight_kg,destination,priority,shipper,stackable,fragile\n'+
+            '1,1,110,70,50,35,A,1,S1,1,0\n'+
+            '2,1,110,70,50,35,A,1,S1,1,0\n'+
+            '3,2,90,60,40,22,B,2,S2,1,1\n';
+  const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+  const a=document.createElement('a');
+  a.href=url; a.download='cargo_template.csv'; a.click();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+};
+
+// [추가됨] 요청 9: 화물 목록 필터
+window.filterCargoList=q=>{
+  const t=(q||'').trim().toLowerCase();
+  document.querySelectorAll('#cargoRows .kv').forEach(row=>{
+    const name=row.querySelector('.k')?.textContent.toLowerCase()||'';
+    row.style.display=(!t||name.includes(t))?'':'none';
+  });
+};
+
+/* [추가됨] 요청 37: 02 계획 수립 단계에서 중앙 3D 영역이 텅 비어 있던 문제.
+   아직 계산 전이라 화물은 없지만, 선택한 컨테이너를 실제 비율로 미리
+   보여준다 — 규격을 바꾸면 즉시 반영돼서 "얼마나 큰 공간인지"를 계산 전에
+   감 잡을 수 있다. 계산 결과(result)와는 무관하게 시각화 레이어만 쓴다. */
+let contOptions=[];
+function previewContainer(){
+  const o=contOptions.find(x=>x.code===contCode);
+  if(!o)return;
+  cont={code:o.code,L:o.L,W:o.W,H:o.H,max_weight:o.max_weight};
+  boxes=[];
+  buildScene();
+}
+
+window.pickCont=c=>{
+  contCode=c;
+  document.querySelectorAll('#conts .opt').forEach(o=>o.classList.toggle('sel',o.dataset.c===c));
+  if(stowMode==='pallet')loadPalletPreview();
+  if(!result)previewContainer();   // 계산 전에만 — 결과가 있으면 그 배치를 유지
+};
+// [추가됨] '현장 대응' / '정밀 탐색' 선택 카드. '현장 대응'은 시간 예산(약 1분) 고정이라
+// 세대 수와 무관하므로, 선택 시 세대 수 조절 바(genField)를 숨긴다.
+window.pickMode=m=>{
+  calcMode=m;
+  document.querySelectorAll('#secMode .opt[data-mode]').forEach(o=>o.classList.toggle('sel',o.dataset.mode===m));
+  document.getElementById('genField').style.display = (m==='precise') ? 'block' : 'none';
+};
+
+window.pickStow=async m=>{
+  stowMode=m;
+  document.querySelectorAll('[data-stow]').forEach(o=>o.classList.toggle('sel',o.dataset.stow===m));
+  const box=document.getElementById('palletSpecs');
+  if(m==='pallet'){box.style.display='block';await loadPalletPreview()}
+  else{box.style.display='none';updHint()}
+};
+
+async function loadPalletPreview(){
+  const box=document.getElementById('palletSpecs');
+  box.innerHTML='<div class="hintline">팔레트 구성을 계산하는 중…</div>';
+  try{
+    const r=await fetch('/api/pallet-preview',{method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({cargo_id:cargoId,container:contCode})});
+    const d=await r.json();
+    palletSpec=d.recommended;
+    box.innerHTML=d.options.map(o=>
+      '<div class="opt '+(o.key===palletSpec?'sel':'')+'" data-p="'+o.key+'" '+
+      'onclick="pickPallet(\''+o.key+'\')">'+
+      '<div class="dot"></div><div class="body"><div class="t">'+o.label+'</div>'+
+      '<div class="s">팔레트 '+o.pallet_count+'개 · 화물 '+o.packed_boxes+
+      '개('+o.packed_pct+'%) · 충전율 '+o.avg_fill_pct+'%</div></div>'+
+      (o.key===d.recommended?'<div class="badge">추천</div>':'')+'</div>').join('');
+    const sel=d.options.find(o=>o.key===palletSpec);
+    palletCount=sel?sel.pallet_count:0;
+    document.getElementById('palletNote').textContent=
+      sel?('팔레트 '+sel.pallet_count+'개 · 화물 '+sel.leftover_boxes+'개 이월'):'표준 팔레트로 묶어 배치';
+    updHint();
+  }catch(e){
+    box.innerHTML='<div class="hintline" style="color:var(--rose)">계산 실패</div>';
+  }
+}
+window.pickPallet=k=>{
+  palletSpec=k;
+  document.querySelectorAll('#palletSpecs .opt').forEach(o=>o.classList.toggle('sel',o.dataset.p===k));
+  const t=document.querySelector('#palletSpecs .opt.sel .s');
+  if(t){const m=t.textContent.match(/팔레트 (\d+)개/); palletCount=m?+m[1]:0}
+  updHint();
+};
+
+/* [추가됨] 요청 35: '계산하기'는 가장 중요한 primary CTA — 계산 중에는
+   상태를 명확히 보여주고 중복 클릭을 막는다. */
+function setRunBusy(busy){
+  const b=document.getElementById('runCalc');
+  if(!b)return;
+  b.disabled=busy||!cargoId;
+  b.classList.toggle('loading',busy);
+  b.textContent=busy?'계산 중…':'계산하기';
+}
+
+async function runOptimization(mode) {
+  if(!cargoId)return;
+  document.getElementById('left').classList.add('collapsed');
+  document.getElementById('tabs').classList.remove('on');
+  document.getElementById('play').classList.remove('on');
+  document.getElementById('busy').classList.add('on');
+  ['bGen','bUtil','bUlo','bTime'].forEach(i=>document.getElementById(i).textContent='—');
+  document.getElementById('barFill').style.width='0%';
+  
+  document.getElementById('busyT').textContent = mode === 'fast' ? '현장 긴급 대응 알고리즘을 1분간 가동합니다' : '최적 배치를 탐색하고 있습니다';
+
+  setRunBusy(true);   // [추가됨] 요청 35: 계산 중 상태 + 중복 클릭 방지
+  const useZones=!document.getElementById('noZones').checked;
+  // [추가됨] 신규 물리 제약 3종 — Container(clp/model.py)/OptimizeReq(server.py)와
+  // 1:1 대응. 단수 제한을 안 쓰면 max_stack_levels는 null(제한 없음)로 보낸다.
+  const minSupportRatio=(+minSupportR.value)/100;
+  const cgTolerance=(+cgTolR.value)/100;
+  const maxStackLevels=stackLimitOn.checked?(+maxStackR.value):null;
+  const r=await fetch('/api/optimize',{method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({cargo_id:cargoId,container:contCode,mode:mode,
+      stow:stowMode,pallet_spec:palletSpec,pop:30,gen:+genR.value,use_zones:useZones,
+      min_support_ratio:minSupportRatio,cg_tolerance:cgTolerance,max_stack_levels:maxStackLevels})});
+  const j=await r.json();
+  poll(j.job_id);
+}
+
+document.getElementById('runCalc').onclick = () => runOptimization(calcMode);
+
+function poll(id){
+  clearInterval(jobTimer);
+  jobTimer=setInterval(async()=>{
+    const r=await fetch('/api/status/'+id); const s=await r.json();
+    if(s.progress){
+      const p=s.progress;
+      // [수정됨] '현장 대응'은 이제 세대 수가 아니라 시간 예산(약 1분) 기준으로
+      // 돌기 때문에, p.time_budget이 있으면 경과시간/예산 비율로 진행률을 표시한다.
+      if(p.time_budget){
+        document.getElementById('bGen').textContent=p.generation;
+        document.getElementById('barFill').style.width=Math.min(100,p.elapsed/p.time_budget*100)+'%';
+      }else{
+        document.getElementById('bGen').textContent=p.generation+'/'+p.total;
+        document.getElementById('barFill').style.width=(p.generation/p.total*100)+'%';
+      }
+      document.getElementById('bUtil').textContent=p.utilization+'%';
+      document.getElementById('bUlo').textContent=p.ulo;
+      document.getElementById('bTime').textContent=p.elapsed+'s';
+    }
+    if(s.status==='done'){clearInterval(jobTimer);loadResult(id)}
+    if(s.status==='error'){clearInterval(jobTimer);
+      // [수정됨] 요청 35: 실패해도 버튼이 '계산 중…'에 멈춰 있지 않도록 복구하고,
+      // 오버레이에 명확한 에러 상태를 남긴다.
+      setRunBusy(false);
+      document.getElementById('busyT').innerHTML=
+        '<span style="color:var(--rose)">계산 실패</span><br>'+
+        '<span style="font-size:13px;font-weight:400;color:var(--ink-2)">'+(s.error||'')+'</span>';
+      document.getElementById('left').classList.remove('collapsed');
+    }
+  },400);
+}
+
+async function loadResult(id){
+  const r=await fetch('/api/result/'+id);
+  result=await r.json();
+  cont=result.container;
+  curJobId=id;
+  document.getElementById('busy').classList.remove('on');
+  document.getElementById('play').classList.add('on');
+  setStepUI(3);
+  setRunBusy(false);   // [추가됨] 요청 35: 계산 완료 → 버튼 원상 복구
+
+  const tabs=document.getElementById('tabs');
+  if(result.solutions.length>1){
+    tabs.classList.add('on');
+    tabs.innerHTML=result.solutions.map((s,i)=>
+      '<div class="tab '+(i===0?'on':'')+'" onclick="pickSol('+i+')">'+
+      '<div class="t">'+s.label+'</div><div class="m">용적률 '+s.metrics.utilization+
+      '% · 재작업 '+s.metrics.relocation+'개</div></div>').join('');
+  }else tabs.classList.remove('on');
+
+  // [추가됨] 파레토 프론트가 실제로 여러 개(front_size>1)일 때만 직접 조정
+  // 슬라이더를 보여준다 — "현장 대응"(휴리스틱)은 해가 1개뿐이라 조정할
+  // 프론트 자체가 없으므로 슬라이더도 의미가 없다.
+  const wb=document.getElementById('weightBox');
+  const canWeight=result.mode==='precise' && (result.front_size||0)>1;
+  wb.classList.remove('expanded');  // [추가됨] 새 결과를 열 때마다 접힌 상태로 시작
+  if(canWeight){
+    wb.classList.add('on');
+    // [수정됨] 팀 피드백: '용적률 최적화'/'시간(리핸들링) 최적화' 버튼이
+    // 슬라이더 양 끝(100/0)과 완전히 같은 화면을 보여줘 중복이라는 지적으로
+    // 제거하고, 대신 슬라이더 양 끝 라벨(wb-end-lo/wb-end-hi)을 크고 색을
+    // 넣어 더 잘 보이게 했다. '비용 최적화'는 아직 미구현이지만 향후 계획
+    // 표시로 헤더 줄의 작은 배지 버튼으로 옮겼다. 슬라이더/눈금 아래에
+    // 있던 상세 설명 문단(wb-hint)도 화면만 복잡하게 한다는 지적으로 뺐다.
+    // [수정됨] 요청 F: 기본 접힘 + 헤더 클릭으로 펼치는 Advanced 토글.
+    // 슬라이더 자체(onWeightInput/buildWeightMap/applyWeight 등)는 무수정,
+    // .wb-body 감싸는 div의 표시 여부만 #weightBox의 expanded 클래스로 제어.
+    wb.innerHTML=
+      '<div class="wb-h" onclick="document.getElementById(\'weightBox\').classList.toggle(\'expanded\')">'+
+      '직접 조정 <span class="wb-badge" id="wbBadge">OFF</span>'+
+      '<span class="wb-ratio" id="wbRatio">—</span>'+
+      '<button class="cost-soon" disabled title="비용 데이터 연동 예정 — 향후 계획">💰 비용 최적화<span class="gb-soon">준비중</span></button>'+
+      '<span class="chev">▸</span>'+
+      '</div>'+
+      '<div class="wb-body">'+
+      '<div class="wb-row"><span class="wb-end wb-end-lo">리핸들링↓ 최소</span>'+
+      '<div class="wb-slider"><div class="wb-bubble" id="wBubble">—</div>'+
+      '<input type="range" id="wSlider" min="0" max="100" value="50">'+
+      '<div class="wb-ticks" id="wTicks"></div></div>'+
+      '<span class="wb-end wb-end-hi">용적률↑ 최대</span></div>'+
+      '</div>';
+    // [추가됨] 1번 요청: 슬라이더 양 끝의 "움직여도 아무것도 안 바뀌는"
+    // 구간을 잘라내기 위해, 먼저 전 구간을 스캔해 유효 가중치 범위를 잡는다.
+    buildWeightMap();
+    document.getElementById('wSlider').addEventListener('input',onWeightInput);
+    renderWeightTicks();
+    updateWeightLabels(50);
+  }else{
+    wb.classList.remove('on','active');
+    wb.innerHTML='';
+    weightMap={lo:0,hi:1,bps:[],count:1};   // 이전 잡의 매핑이 남지 않도록 초기화
+  }
+
+  // [수정됨] 팀 피드백: 계산 전 가중치 슬라이더(및 pendingWeight/
+  // pendingWeightTouched)를 없앴으므로, 결과 화면은 항상 '최대 용적률'
+  // 탭(pickSol(0))으로 연다 — 이게 원래 알고리즘의 대표 성능을 보여주는
+  // 기본값이다.
+  pickSol(0);
+}
+
+// [추가됨] 지금 화면에 표시 중인 해 — 프리셋 탭(curSol=숫자 인덱스)이거나
+// 슬라이더로 직접 고른 해(curSol==='custom')다.
+function activeSol(){
+  return curSol==='custom' ? customSol : (result && result.solutions[curSol]);
+}
+
+window.pickSol=i=>{
+  curSol=i;
+  customSol=null;
+  document.querySelectorAll('.tab').forEach((t,j)=>t.classList.toggle('on',j===i));
+  // 프리셋 탭을 고르면 직접 조정 슬라이더는 다시 중립(OFF) 상태로 되돌린다.
+  const wb=document.getElementById('weightBox');
+  if(wb){
+    wb.classList.remove('active');
+    const badge=document.getElementById('wbBadge');
+    if(badge){badge.textContent='OFF';badge.classList.remove('on')}
+    const slider=document.getElementById('wSlider');
+    if(slider)slider.value=50;
+    updateWeightLabels(50);
+  }
+  switchSolution(result.solutions[i]);
+};
+
+// [추가됨] "슬라이더를 움직이면 용적률이 바뀌는 지점을 미리 보여줄 수
+// 없냐"는 피드백 반영. 파레토 프론트는 이산적인 대안 집합이라, 슬라이더를
+// 1%씩 움직여도 대부분 구간은 같은 해가 유지되다가 특정 지점에서만 다른
+// 해로 넘어간다 — 서버의 pick_by_weight()(clp/solutions.py)와 완전히
+// 같은 계산(정규화 + 체비셰프 + 동점 처리)을 그대로 옮겨와, 가중치 전
+// 구간(0.0~1.0)을 촘촘히 스캔해서 "선택되는 해가 바뀌는" 지점만 찾는다.
+// result.front_curve는 pick_by_weight() 선택 기준과 같은 재시도 전
+// 스냅샷이라 서버를 다시 호출하지 않고도 클라이언트에서 그대로 재현된다.
+//
+// [수정됨] 서버의 선형 가중합 → 증강 체비셰프 스칼라화 교체에 맞춰 여기도
+// 같은 식으로 바꿨다. 선형 가중합은 볼록 껍질 꼭짓점만 고를 수 있어서
+// 슬라이더 전 구간에서 서로 다른 해가 3개밖에 안 나왔다(자세한 이유는
+// clp/solutions.py의 pick_by_weight() 주석 참고).
+const WB_RHO = 1e-3;
+
+function wbPickIndex(curve, w, uLo, uHi, rLo, rHi){
+  let bi=-1, bk=null;
+  for(let i=0;i<curve.length;i++){
+    const p=curve[i];
+    const un = uHi>uLo ? (p.utilization-uLo)/(uHi-uLo) : 1.0;
+    const rn = rHi>rLo ? (rHi-p.relocation)/(rHi-rLo) : 1.0;
+    const du = 1-un, dr = 1-rn;
+    const d = Math.max(w*du,(1-w)*dr) + WB_RHO*(du+dr);
+    // 동점 처리: 용적률 높은 쪽 → 그래도 동점이면 리핸들링 적은 쪽
+    // (서버 min(key=(d, -util, reloc))과 동일)
+    const key=[d, -p.utilization, p.relocation];
+    if(bi<0 || key[0]<bk[0] ||
+       (key[0]===bk[0] && (key[1]<bk[1] || (key[1]===bk[1] && key[2]<bk[2])))){
+      bi=i; bk=key;
+    }
+  }
+  return bi;
+}
+
+// [추가됨] 1번 요청: "양쪽 자르고, 스크롤을 움직였을 때 용적률에 변화가
+// 있는 부분만 남기기".
+//
+// 체비셰프로 바꾸면 도달 가능한 해는 크게 늘지만, 그래도 가중치 0~1을
+// 그대로 슬라이더에 매핑하면 양 끝에 "움직여도 같은 해"인 긴 구간이
+// 남는다(예: w=0.00~0.31이 전부 최소 리핸들링 해). 그래서 전 구간을
+// 촘촘히 스캔해 해가 바뀌는 지점(변화점)을 모두 찾고, 슬라이더에는
+// [첫 변화점 - 여유, 마지막 변화점 + 여유] 범위만 매핑한다.
+// 여유(margin)를 두는 이유는 양 끝 극단해(최대 용적률 / 최소 리핸들링)가
+// 슬라이더 끝에서 여전히 선택 가능해야 하기 때문이다 — 즉 데드존은
+// "잘라내는" 게 아니라 "한 칸 폭으로 줄이는" 것이다.
+let weightMap = {lo:0, hi:1, bps:[], count:1};
+
+function buildWeightMap(){
+  const curve = (result && result.front_curve) || [];
+  weightMap = {lo:0, hi:1, bps:[], count:1};
+  if(curve.length<2) return;
+  const utils=curve.map(p=>p.utilization), relocs=curve.map(p=>p.relocation);
+  const uLo=Math.min(...utils), uHi=Math.max(...utils);
+  const rLo=Math.min(...relocs), rHi=Math.max(...relocs);
+  const N=1000;
+  const bps=[]; const seen=new Set(); let prev=null;
+  for(let i=0;i<=N;i++){
+    const w=i/N;
+    const p=curve[wbPickIndex(curve,w,uLo,uHi,rLo,rHi)];
+    const sig=p.utilization+'/'+p.relocation;
+    seen.add(sig);
+    if(prev!==null && sig!==prev) bps.push({w:w, util:p.utilization, reloc:p.relocation});
+    prev=sig;
+  }
+  weightMap.count = seen.size;
+  if(!bps.length) return;               // 해가 하나뿐 — 자를 구간도 없다
+  const b1=bps[0].w, bk=bps[bps.length-1].w;
+  const span=bk-b1;
+  const avg = bps.length>=2 ? span/(bps.length-1) : 0.12;
+  const margin = Math.min(Math.max(avg*0.5, 0.015), 0.15);
+  weightMap.lo = Math.max(0, b1-margin);
+  weightMap.hi = Math.min(1, bk+margin);
+  if(weightMap.hi - weightMap.lo < 1e-6){ weightMap.lo=0; weightMap.hi=1; }
+  weightMap.bps = bps;
+}
+
+// 슬라이더 위치(0~100) ↔ 실제 가중치(lo~hi) 변환
+function posToWeight(pos){ return weightMap.lo + (pos/100)*(weightMap.hi-weightMap.lo) }
+function weightToPos(w){
+  const sp=weightMap.hi-weightMap.lo;
+  return sp>0 ? Math.max(0,Math.min(100,(w-weightMap.lo)/sp*100)) : 50;
+}
+
+// [추가됨] 2번 요청: 지금 슬라이더가 가리키는 가중치 비율을 항상 보이게.
+// 헤더 줄(#wbRatio)과 핸들을 따라다니는 말풍선(#wBubble) 두 군데에 표시.
+function updateWeightLabels(pos){
+  const w=posToWeight(pos);
+  const up=Math.round(w*100), rp=100-up;
+  const bub=document.getElementById('wBubble');
+  if(bub){
+    bub.innerHTML='용적률 <b>'+up+'</b> : <i>'+rp+'</i> 리핸들링';
+    // range 핸들(폭 16px 가정) 중심에 맞추기 위한 보정
+    bub.style.left='calc('+pos+'% + '+(8-pos*0.16).toFixed(2)+'px)';
+  }
+  const rt=document.getElementById('wbRatio');
+  if(rt) rt.innerHTML='가중치 용적률 <b>'+up+'%</b> · 리핸들링 <i>'+rp+'%</i>';
+}
+
+// [수정됨] 처음엔 눈금 툴팁에 그 지점에서 바뀔 용적률 수치(front_curve
+// 기준, 2차 삽입 재시도 "전" 값)까지 같이 적었는데, 실측해보니 실제
+// 적용 시(재시도 후) 값과 몇 %p씩 차이가 나는 경우가 있었다(예: BR4
+// 데이터에서 75.3%로 표시됐지만 실제로는 77.96%). "몇 % 지점"이라는
+// 잘못된 숫자를 보여주는 것보단, 어디서 바뀌는지 위치만 정확히 보여주고
+// 숫자는 빼는 쪽이 낫다 — 위치(어느 가중치 지점인지)는 서버 스윕과
+// 정확히 일치함을 확인했다. 툴팁에는 대신 그 지점의 가중치 비율을 적는다.
+function renderWeightTicks(){
+  const wrap=document.getElementById('wTicks');
+  if(!wrap)return;
+  wrap.innerHTML=weightMap.bps.map(b=>{
+    const pct=weightToPos(b.w);
+    const up=Math.round(b.w*100);
+    return '<div class="wb-tick" title="용적률 '+up+'% : 리핸들링 '+(100-up)+
+           '% 지점 — 여기서부터 다른 해로 바뀝니다" style="left:'+pct.toFixed(2)+'%"></div>';
+  }).join('');
+}
+
+// [추가됨] 슬라이더를 드래그하는 동안 매 픽셀마다 서버에 요청을 보내지
+// 않도록 120ms 디바운스. 라벨/말풍선은 디바운스 없이 즉시 갱신한다.
+// /api/reweight는 이미 계산된 프론트에서 고르기만 하므로(재탐색 없음)
+// 이 정도 지연으로도 사실상 즉시 반응하는 것처럼 느껴진다.
+function onWeightInput(e){
+  const v=+e.target.value;
+  updateWeightLabels(v);
+  clearTimeout(weightTimer);
+  weightTimer=setTimeout(()=>applyWeight(v),120);
+}
+
+// applyWeight(pos)의 인자는 "슬라이더 위치(0~100)"다. 실제 서버로 보내는
+// 가중치는 posToWeight()로 변환한 값 — 양 끝 데드존을 잘라냈기 때문에
+// 슬라이더 0%가 가중치 0%를 뜻하지 않는다.
+async function applyWeight(pos){
+  if(!curJobId)return;
+  const wv=posToWeight(pos);
+  const w=wv.toFixed(3);
+  let sol;
+  try{
+    const r=await fetch('/api/reweight/'+curJobId+'?util_weight='+w);
+    if(!r.ok)return;
+    sol=await r.json();
+  }catch(e){return}
+  // _weightPct는 PDF 명세서 링크(/api/manifest?util_weight=)가 같은 해를
+  // 다시 찾는 데 쓰이므로, 슬라이더 위치가 아니라 "실제 가중치 %"를 넣는다.
+  sol._weightPct=wv*100;
+  customSol=sol;
+  curSol='custom';
+
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));
+  const wb=document.getElementById('weightBox');
+  if(wb)wb.classList.add('active');
+  const badge=document.getElementById('wbBadge');
+  if(badge){badge.textContent='적용됨';badge.classList.add('on')}
+  const rslider=document.getElementById('wSlider');
+  if(rslider)rslider.value=pos;
+  updateWeightLabels(pos);
+
+  switchSolution(sol);
+}
+// 이 파일은 <script type="module">이라 최상위 함수 선언은 window에 자동으로
+// 붙지 않는다 — HTML의 inline onclick="applyWeight(...)" 속성은 전역
+// 스코프에서 실행되므로, 반드시 window에 명시적으로 걸어줘야 버튼이 동작한다.
+// (pickSol/setColor/pickMode가 window.X=... 형태인 것과 같은 이유.)
+window.applyWeight=applyWeight;
+
+// [추가됨] 팀 피드백: 파레토 그래프의 점을 직접 클릭하면 그 해로 화면이
+// 바로 바뀌게 해달라는 요청. u(용적률)·r(재작업 개수)는 회색 점이 그려진
+// 좌표 그대로(재시도 전 원본, result.front_curve 기준)라서, 서버의
+// pick_by_point()가 각 개체의 _orig_metrics와 정확히 대조해 찾아낸다.
+// applyWeight()와 달리 가중치 슬라이더는 건드리지 않고(OFF 유지), 대신
+// sol._pointUR을 남겨 PDF 다운로드 링크가 이 해를 다시 찾을 수 있게 한다.
+async function pickFrontPoint(u,r){
+  if(!curJobId)return;
+  let sol;
+  try{
+    const req=await fetch('/api/pick_point/'+curJobId+'?u='+u+'&r='+r);
+    if(!req.ok)return;
+    sol=await req.json();
+  }catch(e){return}
+  if(!sol || !sol.metrics)return;
+  sol._pointUR={u,r};
+  customSol=sol;
+  curSol='custom';
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));
+  switchSolution(sol);
+}
+window.pickFrontPoint=pickFrontPoint;
+
+// [추가됨] 파레토 최적해 집합 전체를 용적률×리핸들링 산점도로 그린다.
+// 회색 점 = 탐색이 찾아낸 후보 전체(result.front_curve, 재시도 전 원본
+// 좌표라 강조점과 살짝 다를 수 있음 — 배경 분포 참고용), 색+모양이 있는
+// 점 = 지금 화면에 표시 중인 3개 대표 해(+직접 조정 중이면 그것도).
+// 3개 대표 해 색상(cyan/amber/lime)만으로는 색맹 사용자가 구분하기
+// 어려울 수 있어(전 조합 산점도 기준 검증 시 정상시각 기준치 미달) 모양
+// (삼각형/원/사각형/마름모)을 함께 써서 색에만 의존하지 않게 한다.
+function buildParetoChartHTML(){
+  if(!result || result.mode!=='precise') return '';
+  const curve=result.front_curve||[];
+  if(curve.length<2) return '';
+
+  const SHAPE={
+    max_fill:{color:'var(--amber)', shape:'tri'},
+    balanced:{color:'var(--cyan)', shape:'circle'},
+    min_reloc:{color:'var(--lime)', shape:'sq'},
+  };
+  // [수정됨] 팀 피드백: 그래프의 점을 클릭하면 그 해로 바로 바뀌게 해달라는
+  // 요청 — 3개 대표 해(프리셋 탭) 마크는 result.solutions에서의 실제
+  // 인덱스(idx)를 함께 기억해 두었다가 클릭 시 기존 pickSol(idx)를 그대로
+  // 쓴다(네트워크 요청 없이 즉시 전환). '직접 조정' 마름모는 지금 이미
+  // 표시 중인 해이므로 클릭 핸들러를 붙이지 않는다.
+  const highlights=(result.solutions||[]).map((s,idx)=>({s,idx})).filter(x=>SHAPE[x.s.key]).map(x=>
+    ({u:x.s.metrics.utilization, r:x.s.metrics.relocation, label:x.s.label, idx:x.idx, ...SHAPE[x.s.key]}));
+  if(customSol) highlights.push({u:customSol.metrics.utilization, r:customSol.metrics.relocation,
+    label:'직접 조정', color:'var(--rose)', shape:'dia', idx:null});
+
+  const us=curve.map(p=>p.utilization).concat(highlights.map(p=>p.u));
+  const rs=curve.map(p=>p.relocation).concat(highlights.map(p=>p.r));
+  let uMin=Math.min(...us), uMax=Math.max(...us), rMin=Math.min(...rs), rMax=Math.max(...rs);
+  const uPad=(uMax-uMin)*0.12||2, rPad=(rMax-rMin)*0.14||2;
+  uMin-=uPad; uMax+=uPad; rMin=Math.max(0,rMin-rPad); rMax+=rPad;
+
+  const W=268,H=176,ML=26,MR=8,MT=10,MB=24;
+  const pw=W-ML-MR, ph=H-MT-MB;
+  const px=u=>ML+(u-uMin)/(uMax-uMin||1)*pw;
+  const py=r=>MT+ph-(r-rMin)/(rMax-rMin||1)*ph;
+
+  function mark(cx,cy,shape,color,r){
+    cx=+cx.toFixed(1); cy=+cy.toFixed(1);
+    if(shape==='circle')return '<circle cx="'+cx+'" cy="'+cy+'" r="'+r+'" fill="'+color+'" stroke="var(--deep-2)" stroke-width="2"/>';
+    if(shape==='sq'){const s=r*1.7;return '<rect x="'+(cx-s/2).toFixed(1)+'" y="'+(cy-s/2).toFixed(1)+'" width="'+s.toFixed(1)+'" height="'+s.toFixed(1)+'" rx="1.5" fill="'+color+'" stroke="var(--deep-2)" stroke-width="2"/>';}
+    if(shape==='tri'){const s=r*2.15;return '<polygon points="'+cx+','+(cy-s*0.62).toFixed(1)+' '+(cx-s*0.58).toFixed(1)+','+(cy+s*0.38).toFixed(1)+' '+(cx+s*0.58).toFixed(1)+','+(cy+s*0.38).toFixed(1)+'" fill="'+color+'" stroke="var(--deep-2)" stroke-width="2"/>';}
+    if(shape==='dia'){const s=r*1.5;return '<polygon points="'+cx+','+(cy-s).toFixed(1)+' '+(cx+s).toFixed(1)+','+cy+' '+cx+','+(cy+s).toFixed(1)+' '+(cx-s).toFixed(1)+','+cy+'" fill="'+color+'" stroke="var(--deep-2)" stroke-width="2"/>';}
+    return '';
+  }
+
+  // [수정됨] 팀 피드백: 회색 배경 점(탐색 후보 전체)도 클릭하면 그 지점의
+  // 해로 바로 바뀌도록 pickFrontPoint(u,r)를 연결했다 — 서버에서 재시도
+  // 전 원본 좌표(_orig_metrics)와 정확히 일치하는 개체를 찾아 반환한다.
+  const dots=curve.map(p=>
+    '<circle class="pareto-pt" onclick="pickFrontPoint('+p.utilization+','+p.relocation+')" '+
+    'cx="'+px(p.utilization).toFixed(1)+'" cy="'+py(p.relocation).toFixed(1)+'" r="2.6" '+
+    'fill="var(--ink-2)" fill-opacity=".5" stroke="var(--deep-2)" stroke-width="1.2">'+
+    '<title>용적률 '+p.utilization+'% · 재작업 '+p.relocation+'개 — 클릭하면 이 해로 전환</title></circle>').join('');
+
+  const hi=highlights.map(h=>
+    '<g'+(h.idx!=null?' class="pareto-pt" onclick="pickSol('+h.idx+')"':'')+'>'+mark(px(h.u),py(h.r),h.shape,h.color,4.6)+
+    '<title>'+h.label+' — 용적률 '+h.u+'% · 재작업 '+h.r+'개</title></g>').join('');
+
+  const axis=
+    '<line x1="'+ML+'" y1="'+MT+'" x2="'+ML+'" y2="'+(MT+ph)+'" stroke="var(--edge-lit)" stroke-width="1"/>'+
+    '<line x1="'+ML+'" y1="'+(MT+ph)+'" x2="'+(ML+pw)+'" y2="'+(MT+ph)+'" stroke="var(--edge-lit)" stroke-width="1"/>';
+  const ticks=
+    '<text x="'+ML+'" y="'+(MT+ph+15)+'" font-size="9" fill="var(--ink-2)">'+uMin.toFixed(0)+'%</text>'+
+    '<text x="'+(ML+pw)+'" y="'+(MT+ph+15)+'" font-size="9" fill="var(--ink-2)" text-anchor="end">'+uMax.toFixed(0)+'%</text>'+
+    '<text x="2" y="'+(MT+6)+'" font-size="9" fill="var(--ink-2)">'+Math.round(rMax)+'</text>'+
+    '<text x="2" y="'+(MT+ph)+'" font-size="9" fill="var(--ink-2)">'+Math.round(rMin)+'</text>';
+
+  const legend=
+    '<div class="pareto-legend">'+
+    '<div class="pl-item"><svg width="11" height="11" viewBox="0 0 11 11">'+mark(5.5,5.5,'tri','var(--amber)',4)+'</svg>최대 용적률</div>'+
+    '<div class="pl-item"><svg width="11" height="11" viewBox="0 0 11 11">'+mark(5.5,5.5,'circle','var(--cyan)',4)+'</svg>균형</div>'+
+    '<div class="pl-item"><svg width="11" height="11" viewBox="0 0 11 11">'+mark(5.5,5.5,'sq','var(--lime)',4)+'</svg>최소 리핸들링</div>'+
+    (customSol?'<div class="pl-item"><svg width="11" height="11" viewBox="0 0 11 11">'+mark(5.5,5.5,'dia','var(--rose)',4)+'</svg>직접 조정</div>':'')+
+    '</div>';
+
+  return '<div class="sub-h">파레토 최적해 분포 · 용적률 × 리핸들링</div>'+
+    '<div class="pareto-wrap"><svg class="pareto-svg" viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="xMidYMid meet">'+
+    axis+ticks+dots+hi+'</svg></div>'+legend+
+    '<div class="hintline" style="margin-top:6px">회색 점은 탐색이 찾아낸 후보 '+curve.length+'개 전체, 색이 있는 점은 지금 화면에 표시된 해입니다</div>';
+}
+
+function renderKPI(sol){
+  const m=sol.metrics;
+  const st=result.stow;
+  const unit=(st&&st.mode==='pallet')?'팔레트':'화물';
+  // [수정됨] cg_tolerance/min_support_ratio가 하드코딩(5%/70%)에서 요청별
+  // 설정값(cont.cg_tolerance/cont.min_support_ratio, server.py가 노출)으로
+  // 바뀌었으므로, 화면에 표시하는 기준선도 실제 적용된 값을 따라가게 한다.
+  const cgTolPct=(cont.cg_tolerance!=null?cont.cg_tolerance:0.05)*100;
+  const supportMinPct=(cont.min_support_ratio!=null?cont.min_support_ratio:0.80)*100;
+  const cgOK=m.cg_deviation<=cgTolPct;
+  const shipCount={};
+  const typeCount={};
+  
+  sol.placements.forEach(b=>{
+    shipCount[b.shipper]=(shipCount[b.shipper]||0)+1;
+    typeCount[b.type_id]=(typeCount[b.type_id]||0)+1; 
+  });
+  
+  const unp=Object.entries(sol.unplaced_by_shipper||{});
+  const wtPct=Math.min(100,m.weight/cont.max_weight*100);
+
+  let legendHTML;
+  if(colorBy==='shipper'){
+    legendHTML=Object.entries(shipCount).sort().map(([s,n])=>
+      '<div class="lg"><div class="sw" style="background:'+shipperColor(s)+'"></div>'+
+      '<div class="n">'+s+'</div><div class="c">'+n+'</div></div>').join('');
+  }else if(colorBy==='dest'){
+    legendHTML=['A','B','C'].map((d,i)=>{
+      const n=sol.placements.filter(b=>b.destination===d).length;
+      return n?'<div class="lg"><div class="sw" style="background:'+DEST_BASE[d]+'"></div>'+
+        '<div class="n">'+d+' 하역지 · '+(i+1)+'번째</div><div class="c">'+n+'</div></div>':'';
+    }).join('');
+  }else{
+    legendHTML=Object.entries(typeCount).sort().map(([t,n])=>
+      '<div class="lg"><div class="sw" style="background:'+typeColor(t)+'"></div>'+
+      '<div class="n">타입 '+t+'</div><div class="c">'+n+'</div></div>').join('');
+  }
+
+  // [추가됨] 요청 6: "검토 필요" 패널 — 재작업/미적재/무게중심 문제를
+  // 한 곳에 모아 정상 상태와 명확히 구분한다. 실제 오류(미적재)만 danger,
+  // 나머지(재작업·CoG 초과)는 warning — 빨강 남발을 피한다. 문제가 하나도
+  // 없으면 확인 배지 한 줄만 보여준다.
+  const issues=[];
+  if(m.unplaced>0){
+    issues.push({sev:'danger',t:'미적재 화물 '+m.unplaced+'개',
+      d:unp.map(([s,n])=>s+' '+n+'개').join(' · ')+' · 다음 선적으로 이월이 필요합니다'});
+  }
+  if(!m.lifo_compliant){
+    const byDest=(m.relocation_by_destination&&Object.keys(m.relocation_by_destination).length)?
+      Object.entries(m.relocation_by_destination).sort().map(([d,n])=>d+' 목적지 '+n+'개').join(' · ')+' · ':'';
+    issues.push({sev:'warning',t:'LIFO 재배치 필요 · '+unit+' '+m.relocation+'개',
+      d:byDest+'하역 순서상 적재 순서 조정이 필요합니다'});
+  }
+  if(!cgOK){
+    issues.push({sev:'warning',t:'무게중심 편차 '+m.cg_deviation+'%',
+      d:'권장 기준 '+cgTolPct+'% 이하를 초과했습니다'});
+  }
+  const reviewHTML='<div class="review">'+(issues.length?
+    ('<div class="review-h">검토 필요</div>'+
+     issues.map(x=>'<div class="review-item '+x.sev+'"><div class="ic">⚠</div>'+
+       '<div class="body"><div class="t">'+x.t+'</div><div class="d">'+x.d+'</div></div></div>').join('')):
+    '<div class="review-ok">✓ 검토할 문제가 없습니다</div>')+'</div>';
+
+  document.getElementById('results').innerHTML=
+    '<div class="hero"><div class="l">적재 품질</div><div class="v">'+m.utilization+
+    '<span style="font-size:24px">%</span></div><div class="s">'+m.placed+' / '+m.total+
+    '개 적재 · '+sol.label+(result.use_zones===false?' · 구역 제약 해제':'')+'</div></div>'+
+
+    reviewHTML+
+
+    '<div class="mrow"><div class="mrow-h"><span class="l">평균 지지율</span>'+
+    '<span class="v">'+m.support_avg+'%</span></div>'+
+    '<div class="gauge"><i style="width:'+m.support_avg+'%"></i>'+
+    '<div class="mark" style="left:'+supportMinPct+'%"></div></div>'+
+    '<div class="s">최소 기준 '+supportMinPct+'%</div></div>'+
+
+    '<div class="mrow"><div class="mrow-h"><span class="l">적재 중량</span>'+
+    '<span class="v">'+(m.weight/1000).toFixed(1)+'t</span></div>'+
+    '<div class="gauge"><i style="width:'+wtPct+'%"></i></div>'+
+    '<div class="s">한도 '+(cont.max_weight/1000).toFixed(1)+'t</div></div>'+
+
+    '<div class="sub-h">화물 구분</div>'+
+    '<div class="toggle">'+
+    '<button class="'+(colorBy==='shipper'?'on':'')+'" onclick="setColor(\'shipper\')">화주별</button>'+
+    '<button class="'+(colorBy==='dest'?'on':'')+'" onclick="setColor(\'dest\')">하역지별</button>'+
+    '<button class="'+(colorBy==='type'?'on':'')+'" onclick="setColor(\'type\')">종류별</button></div>'+ 
+    '<div class="legend">'+legendHTML+'</div>'+
+
+    (st&&st.mode==='pallet'?
+      '<div class="sub-h">팔레타이징</div>'+
+      '<div class="kv"><span class="k">규격</span><span class="v">'+(st.spec_label||'')+'</span></div>'+
+      '<div class="kv"><span class="k">팔레트</span><span class="v">'+st.pallet_count+'개</span></div>'+
+      '<div class="kv"><span class="k">수용 화물</span><span class="v">'+st.packed_boxes+' / '+st.original_boxes+'</span></div>'+
+      '<div class="kv"><span class="k">이월 화물</span><span class="v">'+st.leftover_boxes+'개</span></div>':'')+
+    // [수정됨] 팀 피드백: 그래프 점 클릭(pickFrontPoint)으로 고른 해는
+    // util_weight가 아니라 sol._pointUR(u,r)로 표시되므로, PDF 링크도
+    // 그 경우엔 /api/manifest에 u/r을 넘기도록 분기를 추가했다.
+    '<a class="pdfbtn" href="'+(curSol==='custom'?
+      (sol._pointUR?
+        '/api/manifest/'+curJobId+'?u='+sol._pointUR.u+'&r='+sol._pointUR.r:
+        '/api/manifest/'+curJobId+'?util_weight='+(sol._weightPct/100).toFixed(3)):
+      '/api/manifest/'+curJobId+'?sol='+curSol)+'" target="_blank" rel="noopener">'+
+    '&#128190; 작업명세서 PDF 다운로드</a>'+
+
+    '<div class="foot">계산 '+result.elapsed+'초'+
+    (result.front_size>1?' · 파레토 '+result.front_size+'개':'')+'</div>'+
+    buildParetoChartHTML();
+  updHUD();
+}
+window.setColor=c=>{finishXfade();colorBy=c;buildScene();renderKPI(activeSol())};
+</script>
+</body>
+</html>

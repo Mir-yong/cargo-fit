@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# macOS
+.DS_Store
+
+# 작업 도구 · 임시 산출물
+.claude/
+Claude outputs/
+result.json
+
+# 대용량 벤치마크 데이터 — 데모에는 modified_BR6_full.csv 하나면 충분하다.
+# (전부 커밋하면 레포가 3MB+ 커지고 배포 이미지도 같이 무거워진다)
+modified_BR1_full.csv
+modified_BR2_full.csv
+modified_BR4_full.csv
+modified_BR7_full.csv
