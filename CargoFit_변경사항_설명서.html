@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>Cargo Fit 변경사항 설명서</title>
+<style>
+  @page { size: A4; margin: 16mm 14mm 18mm 14mm; }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    font-family:'Apple SD Gothic Neo','Noto Sans KR','Malgun Gothic',sans-serif;
+    color:#111827; font-size:10.2pt; line-height:1.62;
+    -webkit-print-color-adjust:exact; print-color-adjust:exact;
+  }
+  code,.mono{font-family:'SFMono-Regular','D2Coding','Menlo',monospace;font-size:9pt}
+  code{background:#F3F4F6;padding:1px 4px;border-radius:3px;color:#1E3A8A}
+
+  .cover{border-bottom:3px solid #2563EB;padding-bottom:14px;margin-bottom:20px}
+  .cover h1{font-size:23pt;letter-spacing:-.5px;line-height:1.25}
+  .cover .sub{color:#6B7280;font-size:10.5pt;margin-top:6px}
+  .cover .meta{margin-top:12px;font-size:9pt;color:#6B7280}
+  .cover .meta b{color:#111827}
+
+  h2{font-size:14pt;margin:22px 0 10px;padding-bottom:5px;border-bottom:1.5px solid #E5E7EB;
+     page-break-after:avoid}
+  h2 .n{display:inline-block;min-width:26px;color:#2563EB}
+  h3{font-size:11.2pt;margin:14px 0 6px;color:#1E3A8A;page-break-after:avoid}
+  p{margin:5px 0}
+  ul,ol{margin:5px 0 5px 17px}
+  li{margin:2.5px 0}
+
+  table{width:100%;border-collapse:collapse;margin:8px 0;font-size:9.2pt;page-break-inside:avoid}
+  th,td{border:1px solid #E5E7EB;padding:5px 7px;text-align:left;vertical-align:top}
+  th{background:#F3F4F6;font-weight:600;color:#374151}
+  td.c{text-align:center}
+
+  .alert{border-left:3px solid #DC2626;background:#FEF2F2;padding:9px 12px;margin:9px 0;
+         page-break-inside:avoid}
+  .alert .h{font-weight:700;color:#DC2626;margin-bottom:3px}
+  .warn{border-left:3px solid #F59E0B;background:#FFFBEB;padding:9px 12px;margin:9px 0;
+        page-break-inside:avoid}
+  .warn .h{font-weight:700;color:#B45309;margin-bottom:3px}
+  .ok{border-left:3px solid #16A34A;background:#F0FDF4;padding:9px 12px;margin:9px 0;
+      page-break-inside:avoid}
+  .ok .h{font-weight:700;color:#15803D;margin-bottom:3px}
+  .info{border-left:3px solid #2563EB;background:#EFF6FF;padding:9px 12px;margin:9px 0;
+        page-break-inside:avoid}
+  .info .h{font-weight:700;color:#1D4ED8;margin-bottom:3px}
+
+  .link{background:#111827;color:#fff;padding:11px 14px;border-radius:6px;margin:10px 0;
+        page-break-inside:avoid}
+  .link .l{font-size:8.5pt;color:#9CA3AF;letter-spacing:.06em;text-transform:uppercase}
+  .link .u{font-family:'SFMono-Regular',monospace;font-size:11pt;font-weight:700;margin-top:3px}
+  .link .d{font-size:8.8pt;color:#D1D5DB;margin-top:4px}
+
+  .kpi{display:flex;gap:9px;margin:10px 0}
+  .kpi div{flex:1;border:1px solid #E5E7EB;border-radius:6px;padding:9px;text-align:center}
+  .kpi .v{font-size:16pt;font-weight:700;color:#2563EB;font-family:'SFMono-Regular',monospace}
+  .kpi .k{font-size:8.5pt;color:#6B7280;margin-top:2px}
+
+  .sec{page-break-inside:avoid}
+  .pb{page-break-before:always}
+  .muted{color:#6B7280;font-size:9pt}
+</style>
+</head>
+<body>
+
+<div class="cover">
+  <h1>Cargo Fit — 변경사항 설명서</h1>
+  <div class="sub">기존 적재 시뮬레이터 대비 이번에 바뀐 내용 정리</div>
+  <div class="meta">
+    대상: <b>팀원</b> · 작성일: <b>2026-09-15</b> ·
+    저장소: <b>github.com/Mir-yong/cargo-fit</b>
+  </div>
+</div>
+
+<div class="info">
+  <div class="h">3줄 요약</div>
+  <ol style="margin-left:15px">
+    <li><b>최적화 엔진</b>에 물리 제약 4종(파손주의·최대 적재 단수·지지율·무게중심)이 추가되고 화면에서 설정 가능해졌습니다.</li>
+    <li><b>화면 전체를 다시 설계</b>했습니다. 특히 3D 뷰어를 새로 만들었고, 결과 화면이 "무엇을 봐야 할지" 바로 보이도록 정보 구조를 바꿨습니다.</li>
+    <li><b>웹에 배포</b>했습니다. 설치 없이 링크만으로 결과를 볼 수 있습니다.</li>
+  </ol>
+</div>
+
+<h2><span class="n">1</span> 먼저 확인할 것 — 기존과 달라지는 점</h2>
+<p>아래 두 가지는 <b>기존에 쓰던 데이터·결과와 직접 충돌할 수 있으니</b> 반드시 먼저 읽어주세요.</p>
+
+<div class="alert">
+  <div class="h">① 같은 하역지에 priority가 섞인 CSV는 업로드가 거부됩니다</div>
+  <p>목적지별 LIFO(후입선출) 검증을 위해, <b>같은 destination은 모두 같은 priority를 가져야 한다</b>는
+  규칙이 업로드 시점에 강제됩니다. 어긋나면 400 에러와 함께 어느 목적지가 문제인지 알려줍니다.</p>
+  <p class="muted">확인 결과 기존 벤치마크 CSV 5종(BR1·BR2·BR4·BR6·BR7)은 전부 이 규칙을 이미 만족하므로
+  그대로 쓰시면 됩니다. 직접 만든 CSV만 확인이 필요합니다.</p>
+</div>
+
+<div class="alert">
+  <div class="h">② 최소 지지율 기본값이 70% → 80%로 올라갔습니다</div>
+  <p>같은 CSV·같은 조건이라도 <b>이전보다 용적률이 낮게 나올 수 있습니다.</b> 더 보수적으로(안정적으로)
+  쌓기 때문입니다. 예전 수치와 비교할 일이 있으면 좌측 <b>고급 설정</b>에서 지지율을 70%로 내리고
+  돌리면 됩니다.</p>
+</div>
+
+<h2><span class="n">2</span> 접속 · 실행 방법</h2>
+
+<div class="link">
+  <div class="l">설치 없이 결과만 볼 때 (팀원 공유용)</div>
+  <div class="u">https://mir-yong.github.io/cargo-fit/</div>
+  <div class="d">24시간 접속 가능 · 계정 불필요 · 미리 계산된 결과로 3D·적재안 비교·재생까지 동작합니다.
+  단, 새 CSV 계산·가중치 조정·명세서 PDF는 서버가 필요해 이 페이지에서는 빠져 있습니다.</div>
+</div>
+
+<h3>내 컴퓨터에서 전체 기능을 쓸 때</h3>
+<table>
+  <tr><th style="width:26%">항목</th><th>내용</th></tr>
+  <tr><td>저장소</td><td class="mono">git clone https://github.com/Mir-yong/cargo-fit.git</td></tr>
+  <tr><td>Python</td><td><b>3.10 이상 필수</b> (<code>int | None</code> 문법 사용). 3.9 이하는 서버가 시작되지 않습니다.</td></tr>
+  <tr><td>패키지 설치</td><td class="mono">pip install -r requirements.txt</td></tr>
+  <tr><td>실행</td><td class="mono">python server.py &nbsp;→&nbsp; http://localhost:8000</td></tr>
+  <tr><td>인터넷</td><td>필요합니다. 3D 라이브러리(Three.js)와 폰트를 CDN에서 받으므로 오프라인에서는 3D 화면이 뜨지 않습니다.</td></tr>
+  <tr><td>명세서 PDF</td><td>wkhtmltopdf 별도 설치 필요. 없으면 그 버튼만 실패하고 나머지는 정상입니다.
+  (동봉된 <code>Dockerfile</code>로 띄우면 자동 포함됩니다)</td></tr>
+</table>
+
+<h2><span class="n">3</span> 최적화 엔진 변경 — 물리 제약 4종</h2>
+<p>기존에는 코드에 숫자가 박혀 있던 제약들을 <b>화면에서 조절</b>할 수 있게 하고, 없던 제약을 새로 넣었습니다.
+좌측 패널 <b>고급 설정</b>에서 조정합니다.</p>
+
+<table>
+  <tr>
+    <th style="width:20%">제약</th><th style="width:26%">이전</th><th>지금</th>
+  </tr>
+  <tr>
+    <td><b>파손주의<br>(fragile)</b></td>
+    <td>없음. <code>stackable</code> 하나로만 구분</td>
+    <td>CSV에 <code>fragile</code> 컬럼(0/1) 추가 인식. 1이면 <b>그 위에 아무것도 쌓지 않습니다.</b>
+        컬럼이 없는 기존 CSV는 전부 0으로 처리되어 동작이 바뀌지 않습니다.</td>
+  </tr>
+  <tr>
+    <td><b>최대 적재 단수</b></td>
+    <td>제한 없음</td>
+    <td>N단까지만 쌓도록 제한할 수 있습니다. 기본값은 "제한 없음"이라 켜지 않으면 기존과 동일합니다.
+        각 화물이 몇 단째인지도 결과에 기록됩니다.</td>
+  </tr>
+  <tr>
+    <td><b>최소 지지율</b></td>
+    <td>0.70 하드코딩</td>
+    <td>50~95% 조절 가능. <b>기본값 80%</b> (1절 ② 참고)</td>
+  </tr>
+  <tr>
+    <td><b>무게중심 허용오차</b></td>
+    <td>0.05 하드코딩<br>(정밀·현장 두 곳에 따로 박혀 있었음)</td>
+    <td>0~15% 조절 가능. 두 경로가 같은 설정값을 쓰도록 통일했습니다.</td>
+  </tr>
+</table>
+
+<h3>목적지별 LIFO 검증</h3>
+<p>"이 적재안으로 실제 하역이 순서대로 되는가"를 판정해 결과에 표시합니다.</p>
+<ul>
+  <li>업로드 시점: 목적지 ↔ priority 정합성 검사 (1절 ① 참고)</li>
+  <li>결과 화면: <b>검토 필요</b> 패널에 "LIFO 재배치 필요 · 화물 N개"와
+      <b>목적지별 내역</b>("B 목적지 35개 · C 목적지 14개")을 표시</li>
+</ul>
+
+<div class="ok">
+  <div class="h">설계 메모 — 왜 기존 코드가 거의 안 바뀌었나</div>
+  <p>새 설정값들을 함수 인자로 10여 개 함수에 전부 추가하는 대신, 이미 모든 배치·평가 함수에
+  전달되고 있던 <code>Container</code> 객체의 필드로 넣었습니다. 덕분에
+  <code>nsga2.py</code> · <code>heuristic.py</code> · <code>solutions.py</code>의 호출부는
+  <b>한 줄도 수정하지 않았고</b>, 회귀 위험을 최소화했습니다.</p>
+</div>
+
+<div class="warn">
+  <div class="h">작업 중 발견해 고친 버그</div>
+  <p>최대 적재 단수에 off-by-one이 있었습니다. "2단 제한"인데 3단까지 쌓였습니다
+  (<code>level &gt; max</code> → <code>level &gt;= max</code>). 단위 테스트로 잡아 수정했습니다.</p>
+</div>
+
+<h2 class="pb"><span class="n">4</span> 화면 — 전면 재설계</h2>
+<p>가장 큰 변화입니다. "기능이 많아 뭘 봐야 할지 모르겠다"는 문제를 정보 구조 차원에서 다시 짰습니다.</p>
+
+<table>
+  <tr><th style="width:22%">영역</th><th style="width:37%">이전</th><th>지금</th></tr>
+  <tr><td><b>업로드 화면</b></td>
+      <td>좁은 좌측 사이드바 안에 업로드 영역. 나머지 화면은 비어 있음</td>
+      <td>화면 중앙 전체를 쓰는 전용 시작 화면. 업로드하면 작업 화면으로 전환</td></tr>
+  <tr><td><b>단계 이동</b></td>
+      <td>상단 표시만. 클릭 불가</td>
+      <td>클릭해서 이동. <b>선행 데이터가 없으면 잠깁니다</b>(CSV 없으면 02, 결과 없으면 03)</td></tr>
+  <tr><td><b>적재안 선택</b></td>
+      <td>큰 카드 3개</td>
+      <td>한 줄 세그먼트 컨트롤. 선택된 것만 강조</td></tr>
+  <tr><td><b>결과 패널</b></td>
+      <td>같은 크기 카드 5개(용적률·재작업·무게중심·지지율·중량)가 나열</td>
+      <td><b>적재 품질 하나를 크게</b> + 문제는 <b>검토 필요</b> 패널로 분리 +
+          나머지는 작은 목록. 문제 없으면 "검토할 문제가 없습니다"로 표시</td></tr>
+  <tr><td><b>3D 뷰 조작</b></td>
+      <td>우측 세로 버튼 5개(ISO/SIDE/TOP/DOOR/전체화면)</td>
+      <td>상단 세그먼트 <b>[3D][TOP][SIDE][DOOR]</b> + 우하단에 Fit·Reset·전체화면 작게</td></tr>
+  <tr><td><b>가중치 조정</b></td>
+      <td>항상 펼쳐져 있음</td>
+      <td>기본 접힘. 필요할 때만 펼침(적용 여부는 배지로 항상 표시)</td></tr>
+  <tr><td><b>화물 선택</b></td>
+      <td>없음</td>
+      <td>3D에서 화물을 클릭하면 하역지·치수·중량·적재 단수·순서를 보여주는 상세 카드</td></tr>
+  <tr><td><b>계산 버튼</b></td>
+      <td>누르면 상태 변화 없음</td>
+      <td>"계산 중…" 상태 + 중복 클릭 방지 + 실패 시 에러 표시</td></tr>
+  <tr><td><b>02 단계</b></td>
+      <td>중앙이 빈 화면</td>
+      <td>선택한 컨테이너를 3D로 미리 보여줌(규격 바꾸면 즉시 반영)</td></tr>
+</table>
+<p class="muted">그 외: 화물 목록 검색, CSV 템플릿 다운로드, 고급 설정 접기, 브랜드 아이콘 적용.</p>
+
+<h2><span class="n">5</span> 3D 시각화 — 새로 만들었습니다</h2>
+<p>단순 육면체 + 원색이던 화물을 다시 설계했습니다. <b>적재 좌표·치수 계산은 전혀 건드리지 않았고</b>
+보여주는 층만 바꿨습니다.</p>
+<ul>
+  <li><b>형태</b> — 모서리를 다듬은(bevel) 지오메트리. 규격별로 캐시해 화물 100여 개도 가볍게 처리</li>
+  <li><b>색</b> — 채도 낮은 파스텔 7색. 하역지 A~G에 <b>고정 매핑</b>되어 매번 색이 바뀌지 않습니다</li>
+  <li><b>입체감</b> — 윗면/앞면/옆면 밝기를 형상에 구워 넣어(vertex color) 조명과 무관하게 항상 면이 구분됩니다</li>
+  <li><b>그림자</b> — 바닥에 부드러운 그림자가 생겨 화물이 "놓여 있는" 느낌이 납니다</li>
+  <li><b>컨테이너</b> — 선으로만 그리던 것을 반투명 공간으로. 카메라 쪽 벽은 자동으로 비쳐 항상 내부가 보입니다</li>
+  <li><b>라벨</b> — 표면에 글자를 인쇄하는 대신 작은 라벨판을 얹었습니다(큰 화물·선택된 화물만)</li>
+  <li><b>카메라</b> — 컨테이너 8개 꼭짓점을 실제로 투영해 맞추므로 어떤 규격·창 크기에서도 잘리지 않습니다</li>
+</ul>
+
+<div class="warn">
+  <div class="h">작업 중 발견해 고친 문제 3가지</div>
+  <ol style="margin-left:15px">
+    <li><b>화면 전체가 어두웠던 원인</b> — Three.js r155부터 조명 계산이 바뀌어 모든 광원 세기에
+        1/π(약 0.318)가 곱해집니다. 기존 감각으로 넣은 값이 3배 이상 어두워지고 있었습니다.
+        보정 후 실측으로 값을 다시 잡았습니다.</li>
+    <li><b>바닥이 통째로 잿빛</b> — 그림자 계산 범위 밖이 전부 그늘로 처리되는 현상. 범위를 바닥 크기에 맞춰 해결</li>
+    <li><b>라벨 글자가 뒤집힘</b> — 평면을 눕히며 글자 방향이 카메라 쪽을 향했던 문제</li>
+  </ol>
+</div>
+
+<h2><span class="n">6</span> 성능 — 예상 밖의 개선</h2>
+<p>화면에 변화가 없으면 렌더링을 건너뛰도록 바꿨습니다(그림자 재계산도 함께 생략됨).</p>
+<div class="kpi">
+  <div><div class="v">15 → 61</div><div class="k">결과 화면 FPS</div></div>
+  <div><div class="v">161 → 54초</div><div class="k">최적화 계산 시간</div></div>
+  <div><div class="v">3배</div><div class="k">체감 속도 향상</div></div>
+</div>
+<p class="muted">계산 시간까지 줄어든 이유: 브라우저가 3D를 쉬지 않고 다시 그리느라 CPU를 점유하고 있었고,
+같은 컴퓨터에서 돌던 최적화 서버가 그만큼 밀리고 있었습니다. 렌더링을 멈추자 계산이 제 속도를 찾았습니다.</p>
+
+<h2><span class="n">7</span> 데이터 · API 변경 (코드 만지는 사람용)</h2>
+<table>
+  <tr><th style="width:30%">위치</th><th>추가된 항목</th></tr>
+  <tr><td>CSV 입력</td><td><code>fragile</code> (선택, 0/1, 기본 0)</td></tr>
+  <tr><td><code>POST /api/optimize</code></td>
+      <td><code>min_support_ratio</code>(기본 0.80) · <code>max_stack_levels</code>(기본 null) ·
+          <code>cg_tolerance</code>(기본 0.05)</td></tr>
+  <tr><td>결과 · 화물별</td><td><code>fragile</code> · <code>stack_level</code>(0=1단째)</td></tr>
+  <tr><td>결과 · 지표</td><td><code>lifo_compliant</code>(bool) · <code>relocation_by_destination</code>(목적지별 개수)</td></tr>
+  <tr><td>결과 · 컨테이너</td><td>실제 적용된 <code>min_support_ratio</code> · <code>max_stack_levels</code> · <code>cg_tolerance</code></td></tr>
+  <tr><td>명세서 PDF</td><td>파손주의 · 적재 단수 열 추가</td></tr>
+</table>
+<p class="muted">기존 필드는 이름·의미가 그대로이므로, 이전 결과를 읽던 코드는 수정 없이 동작합니다.</p>
+
+<h2><span class="n">8</span> 검증</h2>
+<div class="ok">
+  <div class="h">자동 검사 39개 전부 통과</div>
+  <p>"눌러도 아무 일 없는 버튼"이 없는지 실제 브라우저를 띄워 확인합니다. 뷰 전환·Fit·Reset·휠 줌·드래그
+  회전은 <b>렌더 결과를 해시로 비교</b>해 카메라가 실제로 움직였는지 확인하고, 재생·배속·타임라인·적재안
+  전환·가중치 슬라이더는 실제 값 변화로 확인합니다. JS 에러 0건.</p>
+  <p class="muted">추가로 가중치 슬라이더는 서버(Python)와 화면(JS)이 1001개 지점에서 완전히 같은 해를
+  고르는지 교차 검증했고, 물리 제약 4종은 단위 테스트로 확인했습니다.</p>
+</div>
+
+<h2><span class="n">9</span> 알려진 제약</h2>
+<ul>
+  <li><b>공개 데모 페이지</b>는 미리 계산된 결과만 봅니다. 새 CSV 계산·가중치 조정·명세서 PDF는
+      내 컴퓨터에서 서버를 띄워야 합니다.</li>
+  <li><b>명세서 PDF</b>는 wkhtmltopdf가 설치돼 있어야 합니다(맥 기본 미설치).</li>
+  <li><b>오프라인 불가</b> — 3D 라이브러리와 폰트를 CDN에서 받습니다.</li>
+  <li><b>계산 중 취소 기능이 없습니다.</b> 브라우저를 닫아도 서버에서 계산은 계속 돕니다.
+      여러 번 돌렸다면 서버를 재시작해야 CPU가 정리됩니다.</li>
+  <li><code>START.md</code> · <code>README.md</code>는 아직 옛 내용입니다(경로·사용 순서·"의존성 없음" 문구).
+      이 문서를 기준으로 봐 주세요.</li>
+</ul>
+
+</body>
+</html>
