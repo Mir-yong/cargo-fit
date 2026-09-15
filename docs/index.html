@@ -8,9 +8,9 @@
      아이콘의 원형 배지·워드마크가 뭉개져 읽히지 않으므로, 컨테이너 마크만
      정사각으로 잘라낸 버전을 파비콘·헤더 로고에 쓴다. 전체 아이콘은 크게
      보이는 곳(iOS 홈 화면 등)에만 사용. -->
-<link rel="icon" type="image/png" sizes="32x32" href="/static/brand/favicon-32.png">
-<link rel="icon" type="image/png" sizes="64x64" href="/static/brand/favicon-64.png">
-<link rel="apple-touch-icon" href="/static/brand/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="brand/favicon-32.png">
+<link rel="icon" type="image/png" sizes="64x64" href="brand/favicon-64.png">
+<link rel="apple-touch-icon" href="brand/apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -512,13 +512,14 @@ body.pre-upload #left,body.pre-upload #center,body.pre-upload #right{visibility:
 ::-webkit-scrollbar-thumb{background:var(--edge);border-radius:5px}
 ::-webkit-scrollbar-thumb:hover{background:var(--edge-lit)}
 </style>
+<script>window.CARGOFIT_STATIC=true;</script>
 </head>
 <body class="pre-upload">
 <div class="app">
   <header>
     <!-- [수정됨] 직접 그린 큐브 SVG → 실제 Cargo Fit 브랜드 아이콘(컨테이너 마크) -->
     <div class="logo">
-      <img src="/static/brand/cargofit-mark-256.png" alt="Cargo Fit">
+      <img src="brand/cargofit-mark-256.png" alt="Cargo Fit">
     </div>
     <div class="brand">
       <b>Cargo<i> </i>Fit</b>
@@ -540,7 +541,7 @@ body.pre-upload #left,body.pre-upload #center,body.pre-upload #right{visibility:
     <div id="emptyState">
       <!-- 업로드 전 화면은 공간이 넉넉하므로 전체 브랜드 아이콘을 쓴다
            (헤더·파비콘의 축약 마크와 달리 여기서는 디테일이 다 읽힌다) -->
-      <img class="es-logo" src="/static/brand/cargofit-icon-512.png" alt="Cargo Fit">
+      <img class="es-logo" src="brand/cargofit-icon-512.png" alt="Cargo Fit">
       <div class="es-hero">
         <div class="s">화물 명세를 업로드하세요</div>
       </div>
