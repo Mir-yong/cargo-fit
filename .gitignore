@@ -18,3 +18,6 @@ modified_BR1_full.csv
 modified_BR2_full.csv
 modified_BR4_full.csv
 modified_BR7_full.csv
+
+# 백업본 (배포·커밋 제외)
+_backups/

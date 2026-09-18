@@ -36,7 +36,8 @@ from clp.nsga2 import run_nsga2
 from clp.heuristic import solve as heuristic_solve
 from clp.solutions import pick_three, single_solution, pick_by_weight, pick_by_point
 from clp.pallet import preview_all, build_pallets, PALLET_SPECS
-from clp.manifest import render_manifest_html, build_manifest_pdf
+from clp.manifest import (render_manifest_html, build_manifest_pdf,
+                          wkhtmltopdf_available, make_printable_html)
 
 app = FastAPI(title="LCL 컨테이너 적재 최적화")
 
@@ -484,6 +485,15 @@ async def manifest(job_id: str, sol: int = 0, util_weight: float | None = None,
             html_content = render_manifest_html(result_for_pdf, 0, job_id)
         else:
             html_content = render_manifest_html(j["result"], sol, job_id)
+
+        # [추가됨] wkhtmltopdf가 없으면 에러를 내지 않고 브라우저 인쇄로 폴백한다.
+        # macOS는 원 프로젝트가 아카이브되어 brew 설치 자체가 막혀 있어서,
+        # "설치하세요" 안내만 띄우면 사실상 기능을 못 쓰게 된다. 같은 명세서를
+        # 인쇄용 HTML로 띄우고 사용자가 '대상: PDF로 저장'을 고르면 된다 —
+        # 설치 없이 어느 환경에서나 동작하고 결과물도 사실상 동일하다.
+        if not wkhtmltopdf_available():
+            return HTMLResponse(content=make_printable_html(html_content))
+
         pdf_bytes = build_manifest_pdf(html_content)
     except HTTPException:
         raise

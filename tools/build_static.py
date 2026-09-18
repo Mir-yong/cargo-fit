@@ -50,7 +50,12 @@ def main() -> None:
     #    마운트하지만, GitHub Pages는 하위 경로(/<repo>/)로 서빙하기 때문에
     #    "/static/..." 는 도메인 루트로 잘못 해석돼 404가 난다.
     n = html.count("/static/")
-    html = html.replace('"/static/', '"').replace("'/static/", "'")
+    # [수정됨] "vendor/three.module.js" 처럼 맨 상대경로로 바꾸면 import map이
+    # 깨진다 — import map의 값은 절대 URL이거나 "/", "./", "../" 로 시작해야
+    # 하고, 그렇지 않으면 또 다른 bare specifier로 취급돼 모듈 해석이 실패한다
+    # (Chrome: 'blocked by a null value', 3D 뷰어가 통째로 안 뜸. 실측으로 확인).
+    # "./" 를 붙이면 import map·href·src·url() 어디에서나 안전하다.
+    html = html.replace('"/static/', '"./').replace("'/static/", "'./")
     print(f"   정적 경로 {n}곳을 상대경로로 변환")
 
     with open(idx, "w", encoding="utf-8") as f:
