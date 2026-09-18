@@ -1,0 +1,331 @@
+<!doctype html><html><head><meta charset="utf-8">
+<style>html,body{margin:0;height:100%;background:#EEF1F6}#c{width:100vw;height:100vh;display:block}</style>
+<script type="importmap">{"imports":{"three":"https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.module.js"}}</script>
+</head><body><canvas id="c"></canvas>
+<script type="module">
+import * as THREE from 'three';
+
+const DATA = {"container": {"code": "20ft", "L": 587.0, "W": 233.0, "H": 220.0, "max_weight": 28200.0, "min_support_ratio": 0.8, "max_stack_levels": null, "cg_tolerance": 0.05}, "placements": [{"seq": 0, "box_id": 59, "type_id": 7, "shipper": "S5", "destination": "B", "priority": 2, "x": 538.0, "y": 147.0, "z": 0.0, "dx": 46.0, "dy": 72.0, "dz": 98.0, "weight": 97.373, "stackable": 0, "fragile": 0, "stack_level": 0}, {"seq": 1, "box_id": 57, "type_id": 7, "shipper": "S4", "destination": "B", "priority": 2, "x": 485.0, "y": 0.0, "z": 0.0, "dx": 98.0, "dy": 46.0, "dz": 72.0, "weight": 97.373, "stackable": 1, "fragile": 0, "stack_level": 0}, {"seq": 2, "box_id": 82, "type_id": 9, "shipper": "S6", "destination": "C", "priority": 3, "x": 502.0, "y": 0.0, "z": 72.0, "dx": 85.0, "dy": 30.0, "dz": 84.0, "weight": 64.26, "stackable": 1, "fragile": 0, "stack_level": 1}, {"seq": 3, "box_id": 93, "type_id": 11, "shipper": "S6", "destination": "C", "priority": 3, "x": 552.0, "y": 0.0, "z": 156.0, "dx": 25.0, "dy": 36.0, "dz": 34.0, "weight": 9.18, "stackable": 1, "fragile": 0, "stack_level": 2}, {"seq": 4, "box_id": 89, "type_id": 11, "shipper": "S6", "destination": "C", "priority": 3, "x": 527.0, "y": 0.0, "z": 156.0, "dx": 25.0, "dy": 36.0, "dz": 34.0, "weight": 9.18, "stackable": 1, "fragile": 0, "stack_level": 2}, {"seq": 5, "box_id": 94, "type_id": 11, "shipper": "S6", "destination": "C", "priority": 3, "x": 502.0, "y": 0.0, "z": 156.0, "dx": 25.0, "dy": 36.0, "dz": 34.0, "weight": 9.18, "stackable": 1, "fragile": 0, "stack_level": 2}, {"seq": 6, "box_id": 34, "type_id": 4, "shipper": "S6", "destination": "C", "priority": 3, "x": 502.0, "y": 0.0, "z": 190.0, "dx": 81.0, "dy": 33.0, "dz": 28.0, "weight": 22.453, "stackable": 1, "fragile": 0, "stack_level": 3}, {"seq": 7, "box_id": 40, "type_id": 5, "shipper": "S4", "destination": "B", "priority": 2, "x": 464.0, "y": 48.0, "z": 0.0, "dx": 120.0, "dy": 99.0, "dz": 73.0, "weight": 260.172, "stackable": 1, "fragile": 0, "stack_level": 0}, {"seq": 8, "box_id": 42, "type_id": 5, "shipper": "S4", "destination": "B", "priority": 2, "x": 464.0, "y": 48.0, "z": 73.0, "dx": 120.0, "dy": 99.0, "dz": 73.0, "weight": 260.172, "stackable": 1, "fragile": 0, "stack_level": 1}, {"seq": 9, "box_id": 115, "type_id": 14, "shipper": "S4", "destination": "B", "priority": 2, "x": 545.0, "y": 48.0, "z": 146.0, "dx": 27.0, "dy": 95.0, "dz": 26.0, "weight": 20.007, "stackable": 1, "fragile": 0, "stack_level": 2}, {"seq": 10, "box_id": 13, "type_id": 2, "shipper": "S6", "destination": "C", "priority": 3, "x": 545.0, "y": 48.0, "z": 172.0, "dx": 25.0, "dy": 110.0, "dz": 43.0, "weight": 35.475, "stackable": 1, "fragile": 0, "stack_level": 3}, {"seq": 11, "box_id": 123, "type_id": 15, "shipper": "S5", "destination": "B", "priority": 2, "x": 464.0, "y": 48.0, "z": 146.0, "dx": 81.0, "dy": 94.0, "dz": 44.0, "weight": 100.505, "stackable": 1, "fragile": 0, "stack_level": 2}, {"seq": 12, "box_id": 116, "type_id": 14, "shipper": "S5", "destination": "B", "priority": 2, "x": 507.0, "y": 48.0, "z": 190.0, "dx": 27.0, "dy": 95.0, "dz": 26.0, "weight": 20.007, "stackable": 1, "fragile": 0, "stack_level": 3}, {"seq": 13, "box_id": 15, "type_id": 2, "shipper": "S4", "destination": "B", "priority": 2, "x": 464.0, "y": 48.0, "z": 190.0, "dx": 43.0, "dy": 110.0, "dz": 25.0, "weight": 35.475, "stackable": 1, "fragile": 0, "stack_level": 3}, {"seq": 14, "box_id": 126, "type_id": 15, "shipper": "S5", "destination": "B", "priority": 2, "x": 444.0, "y": 147.0, "z": 0.0, "dx": 94.0, "dy": 81.0, "dz": 44.0, "weight": 100.505, "stackable": 1, "fragile": 0, "stack_level": 0}, {"seq": 15, "box_id": 124, "type_id": 15, "shipper": "S5", "destination": "B", "priority": 2, "x": 444.0, "y": 147.0, "z": 44.0, "dx": 94.0, "dy": 81.0, "dz": 44.0, "weight": 100.505, "stackable": 0, "fragile": 0, "stack_level": 1}, {"seq": 16, "box_id": 38, "type_id": 4, "shipper": "S6", "destination": "C", "priority": 3, "x": 430.0, "y": 110.0, "z": 0.0, "dx": 33.0, "dy": 28.0, "dz": 81.0, "weight": 22.453, "stackable": 1, "fragile": 0, "stack_level": 0}, {"seq": 17, "box_id": 83, "type_id": 9, "shipper": "S5", "destination": "B", "priority": 2, "x": 414.0, "y": 147.0, "z": 0.0, "dx": 30.0, "dy": 84.0, "dz": 85.0, "weight": 64.26, "stackable": 1, "fragile": 0, "stack_level": 0}, {"seq": 18, "box_id": 1, "type_id": 1, "shipper": "S4", "destination": "B", "priority": 2, "x": 414.0, "y": 147.0, "z": 85.0, "dx": 30.0, "dy": 76.0, "dz": 108.0, "weight": 73.872, "stackable": 0, "fragile": 0, "stack_level": 1}, {"seq": 19, "box_id": 101, "type_id": 12, "shipper": "S2", "destination": "A", "priority": 1, "x": 397.0, "y": 48.0, "z": 0.0, "dx": 67.0, "dy": 62.0, "dz": 97.0, "weight": 120.881, "stackable": 1, "fragile": 0, "stack_level": 0}, {"seq": 20, "box_id": 2, "type_id": 1, "shipper": "S6", "destination": "C", "priority": 3, "x": 427.0, "y": 48.0, "z": 97.0, "dx": 30.0, "dy": 76.0, "dz": 108.0, "weight": 73.872, "stackable": 1, "fragile": 0, "stack_level": 1}, {"seq": 21, "box_id": 35, "type_id": 4, "shipper": "S5", "destination": "B", "priority": 2, "x": 397.0, "y": 110.0, "z": 0.0, "dx": 33.0, "dy": 28.0, "dz": 81.0, "weight": 22.453, "stackable": 1, "fragile": 0, "stack_level": 0}, {"seq": 22, "box_id": 11, "type_id": 1, "shipper": "S4", "destination": "B", "priority": 2, "x": 397.0, "y": 48.0, "z": 97.0, "dx": 30.0, "dy": 76.0, "dz": 108.0, "weight": 73.872, "stackable": 1, "fragile": 0, "stack_level": 1}, {"seq": 23, "box_id": 127, "type_id": 15, "shipper": "S4", "destination": "B", "priority": 2, "x": 391.0, "y": 0.0, "z": 0.0, "dx": 94.0, "dy": 44.0, "dz": 81.0, "weight": 100.505, "stackable": 1, "fragile": 0, "stack_level": 0}, {"seq": 24, "box_id": 61, "type_id": 7, "shipper": "S5", "destination": "B", "priority": 2, "x": 391.0, "y": 0.0, "z": 81.0, "dx": 98.0, "dy": 46.0, "dz": 72.0, "weight": 97.373, "stackable": 1, "fragile": 0, "stack_level": 1}, {"seq": 25, "box_id": 113, "type_id": 14, "shipper": "S4", "destination": "B", "priority": 2, "x": 407.0, "y": 0.0, "z": 153.0, "dx": 95.0, "dy": 26.0, "dz": 27.0, "weight": 20.007, "stackable": 0, "fragile": 0, "stack_level": 2}, {"seq": 26, "box_id": 98, "type_id": 12, "shipper": "S1", "destination": "A", "priority": 1, "x": 347.0, "y": 147.0, "z": 0.0, "dx": 67.0, "dy": 62.0, "dz": 97.0, "weight": 120.881, "stackable": 1, "fragile": 0, "stack_level": 0}, {"seq": 27, "box_id": 103, "type_id": 12, "shipper": "S2", "destination": "A", "priority": 1, "x": 347.0, "y": 147.0, "z": 97.0, "dx": 67.0, "dy": 62.0, "dz": 97.0, "weight": 120.881, "stackable": 1, "fragile": 0, "stack_level": 1}, {"seq": 28, "box_id": 86, "type_id": 10, "shipper": "S4", "destination": "B", "priority": 2, "x": 347.0, "y": 147.0, "z": 194.0, "dx": 71.0, "dy": 32.0, "dz": 25.0, "weight": 17.04, "stackable": 1, "fragile": 0, "stack_level": 2}, {"seq": 29, "box_id": 84, "type_id": 10, "shipper": "S5", "destination": "B", "priority": 2, "x": 347.0, "y": 179.0, "z": 194.0, "dx": 71.0, "dy": 32.0, "dz": 25.0, "weight": 17.04, "stackable": 1, "fragile": 0, "stack_level": 2}, {"seq": 30, "box_id": 23, "type_id": 2, "shipper": "S2", "destination": "A", "priority": 1, "x": 280.0, "y": 0.0, "z": 0.0, "dx": 110.0, "dy": 43.0, "dz": 25.0, "weight": 35.475, "stackable": 1, "fragile": 0, "stack_level": 0}, {"seq": 31, "box_id": 20, "type_id": 2, "shipper": "S3", "destination": "A", "priority": 1, "x": 280.0, "y": 0.0, "z": 25.0, "dx": 110.0, "dy": 43.0, "dz": 25.0, "weight": 35.475, "stackable": 1, "fragile": 0, "stack_level": 1}, {"seq": 32, "box_id": 21, "type_id": 2, "shipper": "S3", "destination": "A", "priority": 1, "x": 280.0, "y": 0.0, "z": 50.0, "dx": 110.0, "dy": 43.0, "dz": 25.0, "weight": 35.475, "stackable": 1, "fragile": 0, "stack_level": 2}, {"seq": 33, "box_id": 122, "type_id": 15, "shipper": "S4", "destination": "B", "priority": 2, "x": 297.0, "y": 0.0, "z": 75.0, "dx": 94.0, "dy": 44.0, "dz": 81.0, "weight": 100.505, "stackable": 1, "fragile": 0, "stack_level": 3}, {"seq": 34, "box_id": 17, "type_id": 2, "shipper": "S5", "destination": "B", "priority": 2, "x": 297.0, "y": 0.0, "z": 156.0, "dx": 110.0, "dy": 43.0, "dz": 25.0, "weight": 35.475, "stackable": 1, "fragile": 0, "stack_level": 4}, {"seq": 35, "box_id": 24, "type_id": 2, "shipper": "S4", "destination": "B", "priority": 2, "x": 297.0, "y": 0.0, "z": 181.0, "dx": 110.0, "dy": 43.0, "dz": 25.0, "weight": 35.475, "stackable": 1, "fragile": 0, "stack_level": 5}, {"seq": 36, "box_id": 43, "type_id": 5, "shipper": "S1", "destination": "A", "priority": 1, "x": 277.0, "y": 48.0, "z": 0.0, "dx": 120.0, "dy": 99.0, "dz": 73.0, "weight": 260.172, "stackable": 1, "fragile": 0, "stack_level": 0}, {"seq": 37, "box_id": 80, "type_id": 9, "shipper": "S5", "destination": "B", "priority": 2, "x": 347.0, "y": 48.0, "z": 73.0, "dx": 30.0, "dy": 84.0, "dz": 85.0, "weight": 64.26, "stackable": 1, "fragile": 0, "stack_level": 1}, {"seq": 38, "box_id": 111, "type_id": 14, "shipper": "S4", "destination": "B", "priority": 2, "x": 347.0, "y": 48.0, "z": 158.0, "dx": 27.0, "dy": 95.0, "dz": 26.0, "weight": 20.007, "stackable": 1, "fragile": 0, "stack_level": 2}, {"seq": 39, "box_id": 118, "type_id": 14, "shipper": "S4", "destination": "B", "priority": 2, "x": 347.0, "y": 48.0, "z": 184.0, "dx": 27.0, "dy": 95.0, "dz": 26.0, "weight": 20.007, "stackable": 1, "fragile": 0, "stack_level": 3}, {"seq": 40, "box_id": 53, "type_id": 6, "shipper": "S2", "destination": "A", "priority": 1, "x": 277.0, "y": 147.0, "z": 0.0, "dx": 70.0, "dy": 48.0, "dz": 111.0, "weight": 111.888, "stackable": 1, "fragile": 0, "stack_level": 0}, {"seq": 41, "box_id": 37, "type_id": 4, "shipper": "S5", "destination": "B", "priority": 2, "x": 302.0, "y": 147.0, "z": 111.0, "dx": 33.0, "dy": 28.0, "dz": 81.0, "weight": 22.453, "stackable": 1, "fragile": 0, "stack_level": 1}, {"seq": 42, "box_id": 73, "type_id": 8, "shipper": "S4", "destination": "B", "priority": 2, "x": 277.0, "y": 195.0, "z": 0.0, "dx": 66.0, "dy": 31.0, "dz": 95.0, "weight": 58.311, "stackable": 1, "fragile": 0, "stack_level": 0}, {"seq": 43, "box_id": 54, "type_id": 6, "shipper": "S1", "destination": "A", "priority": 1, "x": 277.0, "y": 48.0, "z": 73.0, "dx": 70.0, "dy": 48.0, "dz": 111.0, "weight": 111.888, "stackable": 0, "fragile": 0, "stack_level": 1}, {"seq": 44, "box_id": 55, "type_id": 6, "shipper": "S2", "destination": "A", "priority": 1, "x": 277.0, "y": 96.0, "z": 73.0, "dx": 70.0, "dy": 48.0, "dz": 111.0, "weight": 111.888, "stackable": 1, "fragile": 0, "stack_level": 1}, {"seq": 45, "box_id": 106, "type_id": 13, "shipper": "S4", "destination": "B", "priority": 2, "x": 302.0, "y": 96.0, "z": 184.0, "dx": 25.0, "dy": 23.0, "dz": 33.0, "weight": 5.692, "stackable": 1, "fragile": 0, "stack_level": 2}, {"seq": 46, "box_id": 108, "type_id": 13, "shipper": "S4", "destination": "B", "priority": 2, "x": 302.0, "y": 119.0, "z": 184.0, "dx": 25.0, "dy": 23.0, "dz": 33.0, "weight": 5.692, "stackable": 1, "fragile": 0, "stack_level": 2}, {"seq": 47, "box_id": 75, "type_id": 8, "shipper": "S4", "destination": "B", "priority": 2, "x": 277.0, "y": 195.0, "z": 95.0, "dx": 66.0, "dy": 31.0, "dz": 95.0, "weight": 58.311, "stackable": 1, "fragile": 0, "stack_level": 1}, {"seq": 48, "box_id": 91, "type_id": 11, "shipper": "S5", "destination": "B", "priority": 2, "x": 277.0, "y": 147.0, "z": 111.0, "dx": 25.0, "dy": 36.0, "dz": 34.0, "weight": 9.18, "stackable": 1, "fragile": 0, "stack_level": 1}, {"seq": 49, "box_id": 90, "type_id": 11, "shipper": "S4", "destination": "B", "priority": 2, "x": 277.0, "y": 147.0, "z": 145.0, "dx": 25.0, "dy": 36.0, "dz": 34.0, "weight": 9.18, "stackable": 1, "fragile": 0, "stack_level": 2}, {"seq": 50, "box_id": 92, "type_id": 11, "shipper": "S5", "destination": "B", "priority": 2, "x": 277.0, "y": 147.0, "z": 179.0, "dx": 25.0, "dy": 36.0, "dz": 34.0, "weight": 9.18, "stackable": 1, "fragile": 0, "stack_level": 3}, {"seq": 51, "box_id": 87, "type_id": 11, "shipper": "S5", "destination": "B", "priority": 2, "x": 277.0, "y": 96.0, "z": 184.0, "dx": 25.0, "dy": 36.0, "dz": 34.0, "weight": 9.18, "stackable": 1, "fragile": 0, "stack_level": 2}, {"seq": 52, "box_id": 22, "type_id": 2, "shipper": "S6", "destination": "C", "priority": 3, "x": 234.0, "y": 200.0, "z": 0.0, "dx": 43.0, "dy": 25.0, "dz": 110.0, "weight": 35.475, "stackable": 1, "fragile": 0, "stack_level": 0}, {"seq": 53, "box_id": 19, "type_id": 2, "shipper": "S6", "destination": "C", "priority": 3, "x": 234.0, "y": 200.0, "z": 110.0, "dx": 43.0, "dy": 25.0, "dz": 110.0, "weight": 35.475, "stackable": 0, "fragile": 0, "stack_level": 1}, {"seq": 54, "box_id": 58, "type_id": 7, "shipper": "S3", "destination": "A", "priority": 1, "x": 231.0, "y": 48.0, "z": 0.0, "dx": 46.0, "dy": 98.0, "dz": 72.0, "weight": 97.373, "stackable": 1, "fragile": 0, "stack_level": 0}, {"seq": 55, "box_id": 16, "type_id": 2, "shipper": "S5", "destination": "B", "priority": 2, "x": 231.0, "y": 146.0, "z": 0.0, "dx": 43.0, "dy": 25.0, "dz": 110.0, "weight": 35.475, "stackable": 1, "fragile": 0, "stack_level": 0}, {"seq": 56, "box_id": 14, "type_id": 2, "shipper": "S5", "destination": "B", "priority": 2, "x": 231.0, "y": 171.0, "z": 0.0, "dx": 43.0, "dy": 25.0, "dz": 110.0, "weight": 35.475, "stackable": 1, "fragile": 0, "stack_level": 0}, {"seq": 57, "box_id": 63, "type_id": 7, "shipper": "S5", "destination": "B", "priority": 2, "x": 231.0, "y": 48.0, "z": 72.0, "dx": 46.0, "dy": 98.0, "dz": 72.0, "weight": 97.373, "stackable": 1, "fragile": 0, "stack_level": 1}, {"seq": 58, "box_id": 18, "type_id": 2, "shipper": "S5", "destination": "B", "priority": 2, "x": 231.0, "y": 146.0, "z": 110.0, "dx": 43.0, "dy": 25.0, "dz": 110.0, "weight": 35.475, "stackable": 1, "fragile": 0, "stack_level": 1}, {"seq": 59, "box_id": 32, "type_id": 4, "shipper": "S4", "destination": "B", "priority": 2, "x": 231.0, "y": 171.0, "z": 110.0, "dx": 33.0, "dy": 28.0, "dz": 81.0, "weight": 22.453, "stackable": 1, "fragile": 0, "stack_level": 1}, {"seq": 60, "box_id": 64, "type_id": 7, "shipper": "S5", "destination": "B", "priority": 2, "x": 231.0, "y": 48.0, "z": 144.0, "dx": 46.0, "dy": 98.0, "dz": 72.0, "weight": 97.373, "stackable": 0, "fragile": 0, "stack_level": 2}, {"seq": 61, "box_id": 52, "type_id": 6, "shipper": "S3", "destination": "A", "priority": 1, "x": 210.0, "y": 0.0, "z": 0.0, "dx": 70.0, "dy": 48.0, "dz": 111.0, "weight": 111.888, "stackable": 1, "fragile": 0, "stack_level": 0}, {"seq": 62, "box_id": 5, "type_id": 1, "shipper": "S2", "destination": "A", "priority": 1, "x": 201.0, "y": 48.0, "z": 0.0, "dx": 30.0, "dy": 76.0, "dz": 108.0, "weight": 73.872, "stackable": 1, "fragile": 0, "stack_level": 0}, {"seq": 63, "box_id": 12, "type_id": 1, "shipper": "S3", "destination": "A", "priority": 1, "x": 201.0, "y": 124.0, "z": 0.0, "dx": 30.0, "dy": 76.0, "dz": 108.0, "weight": 73.872, "stackable": 1, "fragile": 0, "stack_level": 0}, {"seq": 64, "box_id": 36, "type_id": 4, "shipper": "S2", "destination": "A", "priority": 1, "x": 201.0, "y": 200.0, "z": 0.0, "dx": 33.0, "dy": 28.0, "dz": 81.0, "weight": 22.453, "stackable": 1, "fragile": 0, "stack_level": 0}, {"seq": 65, "box_id": 39, "type_id": 4, "shipper": "S4", "destination": "B", "priority": 2, "x": 201.0, "y": 200.0, "z": 81.0, "dx": 33.0, "dy": 28.0, "dz": 81.0, "weight": 22.453, "stackable": 1, "fragile": 0, "stack_level": 1}, {"seq": 66, "box_id": 7, "type_id": 1, "shipper": "S1", "destination": "A", "priority": 1, "x": 201.0, "y": 48.0, "z": 108.0, "dx": 30.0, "dy": 76.0, "dz": 108.0, "weight": 73.872, "stackable": 1, "fragile": 0, "stack_level": 1}, {"seq": 67, "box_id": 10, "type_id": 1, "shipper": "S6", "destination": "C", "priority": 3, "x": 201.0, "y": 124.0, "z": 108.0, "dx": 30.0, "dy": 76.0, "dz": 108.0, "weight": 73.872, "stackable": 1, "fragile": 0, "stack_level": 1}, {"seq": 68, "box_id": 9, "type_id": 1, "shipper": "S1", "destination": "A", "priority": 1, "x": 171.0, "y": 147.0, "z": 0.0, "dx": 30.0, "dy": 76.0, "dz": 108.0, "weight": 73.872, "stackable": 1, "fragile": 0, "stack_level": 0}, {"seq": 69, "box_id": 4, "type_id": 1, "shipper": "S3", "destination": "A", "priority": 1, "x": 171.0, "y": 147.0, "z": 108.0, "dx": 30.0, "dy": 76.0, "dz": 108.0, "weight": 73.872, "stackable": 1, "fragile": 0, "stack_level": 1}, {"seq": 70, "box_id": 3, "type_id": 1, "shipper": "S1", "destination": "A", "priority": 1, "x": 141.0, "y": 147.0, "z": 0.0, "dx": 30.0, "dy": 76.0, "dz": 108.0, "weight": 73.872, "stackable": 1, "fragile": 0, "stack_level": 0}, {"seq": 71, "box_id": 8, "type_id": 1, "shipper": "S3", "destination": "A", "priority": 1, "x": 141.0, "y": 147.0, "z": 108.0, "dx": 30.0, "dy": 76.0, "dz": 108.0, "weight": 73.872, "stackable": 0, "fragile": 0, "stack_level": 1}, {"seq": 72, "box_id": 51, "type_id": 6, "shipper": "S3", "destination": "A", "priority": 1, "x": 140.0, "y": 0.0, "z": 0.0, "dx": 70.0, "dy": 48.0, "dz": 111.0, "weight": 111.888, "stackable": 1, "fragile": 0, "stack_level": 0}, {"seq": 73, "box_id": 120, "type_id": 14, "shipper": "S3", "destination": "A", "priority": 1, "x": 202.0, "y": 0.0, "z": 111.0, "dx": 95.0, "dy": 26.0, "dz": 27.0, "weight": 20.007, "stackable": 1, "fragile": 0, "stack_level": 1}, {"seq": 74, "box_id": 119, "type_id": 14, "shipper": "S2", "destination": "A", "priority": 1, "x": 202.0, "y": 0.0, "z": 138.0, "dx": 95.0, "dy": 26.0, "dz": 27.0, "weight": 20.007, "stackable": 1, "fragile": 0, "stack_level": 2}, {"seq": 75, "box_id": 117, "type_id": 14, "shipper": "S3", "destination": "A", "priority": 1, "x": 202.0, "y": 0.0, "z": 165.0, "dx": 95.0, "dy": 26.0, "dz": 27.0, "weight": 20.007, "stackable": 1, "fragile": 0, "stack_level": 3}, {"seq": 76, "box_id": 112, "type_id": 14, "shipper": "S2", "destination": "A", "priority": 1, "x": 202.0, "y": 0.0, "z": 192.0, "dx": 95.0, "dy": 26.0, "dz": 27.0, "weight": 20.007, "stackable": 1, "fragile": 0, "stack_level": 4}, {"seq": 77, "box_id": 129, "type_id": 15, "shipper": "S2", "destination": "A", "priority": 1, "x": 120.0, "y": 48.0, "z": 0.0, "dx": 81.0, "dy": 94.0, "dz": 44.0, "weight": 100.505, "stackable": 1, "fragile": 0, "stack_level": 0}, {"seq": 78, "box_id": 29, "type_id": 3, "shipper": "S2", "destination": "A", "priority": 1, "x": 120.0, "y": 48.0, "z": 44.0, "dx": 81.0, "dy": 55.0, "dz": 92.0, "weight": 122.958, "stackable": 1, "fragile": 0, "stack_level": 1}, {"seq": 79, "box_id": 33, "type_id": 4, "shipper": "S2", "destination": "A", "priority": 1, "x": 160.0, "y": 48.0, "z": 136.0, "dx": 33.0, "dy": 28.0, "dz": 81.0, "weight": 22.453, "stackable": 1, "fragile": 0, "stack_level": 2}, {"seq": 80, "box_id": 31, "type_id": 4, "shipper": "S1", "destination": "A", "priority": 1, "x": 127.0, "y": 48.0, "z": 136.0, "dx": 33.0, "dy": 28.0, "dz": 81.0, "weight": 22.453, "stackable": 1, "fragile": 0, "stack_level": 2}, {"seq": 81, "box_id": 107, "type_id": 13, "shipper": "S6", "destination": "C", "priority": 3, "x": 127.0, "y": 76.0, "z": 136.0, "dx": 25.0, "dy": 23.0, "dz": 33.0, "weight": 5.692, "stackable": 1, "fragile": 0, "stack_level": 2}, {"seq": 82, "box_id": 72, "type_id": 8, "shipper": "S3", "destination": "A", "priority": 1, "x": 120.0, "y": 103.0, "z": 44.0, "dx": 66.0, "dy": 31.0, "dz": 95.0, "weight": 58.311, "stackable": 1, "fragile": 0, "stack_level": 1}, {"seq": 83, "box_id": 50, "type_id": 6, "shipper": "S1", "destination": "A", "priority": 1, "x": 70.0, "y": 0.0, "z": 0.0, "dx": 70.0, "dy": 48.0, "dz": 111.0, "weight": 111.888, "stackable": 1, "fragile": 0, "stack_level": 0}, {"seq": 84, "box_id": 70, "type_id": 8, "shipper": "S2", "destination": "A", "priority": 1, "x": 136.0, "y": 0.0, "z": 111.0, "dx": 66.0, "dy": 31.0, "dz": 95.0, "weight": 58.311, "stackable": 1, "fragile": 0, "stack_level": 1}, {"seq": 85, "box_id": 69, "type_id": 8, "shipper": "S3", "destination": "A", "priority": 1, "x": 70.0, "y": 0.0, "z": 111.0, "dx": 66.0, "dy": 31.0, "dz": 95.0, "weight": 58.311, "stackable": 1, "fragile": 0, "stack_level": 1}, {"seq": 86, "box_id": 27, "type_id": 3, "shipper": "S1", "destination": "A", "priority": 1, "x": 60.0, "y": 147.0, "z": 0.0, "dx": 81.0, "dy": 55.0, "dz": 92.0, "weight": 122.958, "stackable": 1, "fragile": 0, "stack_level": 0}, {"seq": 87, "box_id": 67, "type_id": 8, "shipper": "S3", "destination": "A", "priority": 1, "x": 60.0, "y": 202.0, "z": 0.0, "dx": 66.0, "dy": 31.0, "dz": 95.0, "weight": 58.311, "stackable": 1, "fragile": 0, "stack_level": 0}, {"seq": 88, "box_id": 26, "type_id": 3, "shipper": "S1", "destination": "A", "priority": 1, "x": 60.0, "y": 147.0, "z": 92.0, "dx": 81.0, "dy": 55.0, "dz": 92.0, "weight": 122.958, "stackable": 1, "fragile": 0, "stack_level": 1}, {"seq": 89, "box_id": 104, "type_id": 13, "shipper": "S6", "destination": "C", "priority": 3, "x": 110.0, "y": 147.0, "z": 184.0, "dx": 25.0, "dy": 23.0, "dz": 33.0, "weight": 5.692, "stackable": 1, "fragile": 0, "stack_level": 2}, {"seq": 90, "box_id": 109, "type_id": 13, "shipper": "S6", "destination": "C", "priority": 3, "x": 110.0, "y": 170.0, "z": 184.0, "dx": 25.0, "dy": 23.0, "dz": 33.0, "weight": 5.692, "stackable": 1, "fragile": 0, "stack_level": 2}, {"seq": 91, "box_id": 105, "type_id": 13, "shipper": "S3", "destination": "A", "priority": 1, "x": 85.0, "y": 147.0, "z": 184.0, "dx": 25.0, "dy": 23.0, "dz": 33.0, "weight": 5.692, "stackable": 1, "fragile": 0, "stack_level": 2}, {"seq": 92, "box_id": 110, "type_id": 13, "shipper": "S2", "destination": "A", "priority": 1, "x": 85.0, "y": 170.0, "z": 184.0, "dx": 25.0, "dy": 23.0, "dz": 33.0, "weight": 5.692, "stackable": 1, "fragile": 0, "stack_level": 2}, {"seq": 93, "box_id": 68, "type_id": 8, "shipper": "S1", "destination": "A", "priority": 1, "x": 60.0, "y": 202.0, "z": 95.0, "dx": 66.0, "dy": 31.0, "dz": 95.0, "weight": 58.311, "stackable": 1, "fragile": 0, "stack_level": 1}, {"seq": 94, "box_id": 95, "type_id": 11, "shipper": "S2", "destination": "A", "priority": 1, "x": 60.0, "y": 147.0, "z": 184.0, "dx": 25.0, "dy": 36.0, "dz": 34.0, "weight": 9.18, "stackable": 1, "fragile": 0, "stack_level": 2}, {"seq": 95, "box_id": 78, "type_id": 9, "shipper": "S3", "destination": "A", "priority": 1, "x": 30.0, "y": 147.0, "z": 0.0, "dx": 30.0, "dy": 84.0, "dz": 85.0, "weight": 64.26, "stackable": 1, "fragile": 0, "stack_level": 0}, {"seq": 96, "box_id": 76, "type_id": 9, "shipper": "S2", "destination": "A", "priority": 1, "x": 30.0, "y": 147.0, "z": 85.0, "dx": 30.0, "dy": 84.0, "dz": 85.0, "weight": 64.26, "stackable": 0, "fragile": 0, "stack_level": 1}, {"seq": 97, "box_id": 48, "type_id": 6, "shipper": "S1", "destination": "A", "priority": 1, "x": 0.0, "y": 0.0, "z": 0.0, "dx": 70.0, "dy": 48.0, "dz": 111.0, "weight": 111.888, "stackable": 0, "fragile": 0, "stack_level": 0}, {"seq": 98, "box_id": 41, "type_id": 5, "shipper": "S1", "destination": "A", "priority": 1, "x": 0.0, "y": 48.0, "z": 0.0, "dx": 120.0, "dy": 99.0, "dz": 73.0, "weight": 260.172, "stackable": 1, "fragile": 0, "stack_level": 0}, {"seq": 99, "box_id": 79, "type_id": 9, "shipper": "S1", "destination": "A", "priority": 1, "x": 0.0, "y": 147.0, "z": 0.0, "dx": 30.0, "dy": 84.0, "dz": 85.0, "weight": 64.26, "stackable": 1, "fragile": 0, "stack_level": 0}, {"seq": 100, "box_id": 44, "type_id": 5, "shipper": "S2", "destination": "A", "priority": 1, "x": 0.0, "y": 48.0, "z": 73.0, "dx": 120.0, "dy": 99.0, "dz": 73.0, "weight": 260.172, "stackable": 1, "fragile": 0, "stack_level": 1}, {"seq": 101, "box_id": 62, "type_id": 7, "shipper": "S2", "destination": "A", "priority": 1, "x": 81.0, "y": 48.0, "z": 146.0, "dx": 46.0, "dy": 98.0, "dz": 72.0, "weight": 97.373, "stackable": 1, "fragile": 0, "stack_level": 2}, {"seq": 102, "box_id": 77, "type_id": 9, "shipper": "S1", "destination": "A", "priority": 1, "x": 0.0, "y": 147.0, "z": 85.0, "dx": 30.0, "dy": 84.0, "dz": 85.0, "weight": 64.26, "stackable": 1, "fragile": 0, "stack_level": 1}, {"seq": 103, "box_id": 121, "type_id": 15, "shipper": "S3", "destination": "A", "priority": 1, "x": 0.0, "y": 48.0, "z": 146.0, "dx": 81.0, "dy": 94.0, "dz": 44.0, "weight": 100.505, "stackable": 1, "fragile": 0, "stack_level": 2}, {"seq": 104, "box_id": 88, "type_id": 11, "shipper": "S3", "destination": "A", "priority": 1, "x": 0.0, "y": 147.0, "z": 170.0, "dx": 25.0, "dy": 36.0, "dz": 34.0, "weight": 9.18, "stackable": 1, "fragile": 0, "stack_level": 2}, {"seq": 105, "box_id": 96, "type_id": 11, "shipper": "S3", "destination": "A", "priority": 1, "x": 0.0, "y": 183.0, "z": 170.0, "dx": 25.0, "dy": 36.0, "dz": 34.0, "weight": 9.18, "stackable": 1, "fragile": 0, "stack_level": 2}, {"seq": 106, "box_id": 85, "type_id": 10, "shipper": "S3", "destination": "A", "priority": 1, "x": 0.0, "y": 48.0, "z": 190.0, "dx": 71.0, "dy": 32.0, "dz": 25.0, "weight": 17.04, "stackable": 1, "fragile": 0, "stack_level": 3}]};
+const cont = DATA.container, boxes = DATA.placements;
+const L=cont.L, W=cont.W, H=cont.H;
+
+/* ══════════ 목적지 색 — 고채도, 확실히 구분 ══════════ */
+const DEST_COLOR={A:'#E8512F',B:'#1F6FEB',C:'#F2A81D',D:'#16A34A',E:'#8B5CF6',F:'#0E9488',G:'#DB2777'};
+const FALLBACK=['#E8512F','#1F6FEB','#F2A81D','#16A34A','#8B5CF6','#0E9488','#DB2777'];
+
+/* ══════════ 렌더러 ══════════ */
+const cv=document.getElementById('c');
+const renderer=new THREE.WebGLRenderer({canvas:cv,antialias:true,alpha:false});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setSize(innerWidth,innerHeight);
+renderer.shadowMap.enabled=true; renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.outputColorSpace=THREE.SRGBColorSpace;
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0xEEF1F6);
+const camera=new THREE.PerspectiveCamera(40,innerWidth/innerHeight,1,20000);
+
+scene.add(new THREE.AmbientLight(0xffffff,1.35));
+const key=new THREE.DirectionalLight(0xffffff,1.5); key.castShadow=true;
+const fill=new THREE.DirectionalLight(0xffffff,.5);
+const rim=new THREE.DirectionalLight(0xffffff,.35);
+scene.add(key,fill,rim);
+
+const root=new THREE.Group(); scene.add(root);
+
+/* ══════════ 골판지 카톤 텍스처 (흰 베이스 → material.color로 착색) ══════════ */
+function cartonTexture(){
+  const S=512, cv=document.createElement('canvas'); cv.width=cv.height=S;
+  const g=cv.getContext('2d');
+  g.fillStyle='#ffffff'; g.fillRect(0,0,S,S);
+  // 종이 얼룩 — 큰 스케일의 불균일함이 "종이"로 읽히게 하는 핵심
+  for(let i=0;i<120;i++){
+    const x=Math.random()*S,y=Math.random()*S,r=18+Math.random()*70;
+    const gr=g.createRadialGradient(x,y,0,x,y,r);
+    const a=0.03+Math.random()*0.05;
+    gr.addColorStop(0,'rgba(90,60,25,'+a+')'); gr.addColorStop(1,'rgba(90,60,25,0)');
+    g.fillStyle=gr; g.beginPath(); g.arc(x,y,r,0,7); g.fill();
+  }
+  // 골판지 플루트 — 굵게, 확실히 보이게
+  for(let y=0;y<S;y+=14){
+    g.fillStyle='rgba(0,0,0,0.085)'; g.fillRect(0,y,S,5);
+    g.fillStyle='rgba(255,255,255,0.40)'; g.fillRect(0,y+5,S,4);
+  }
+  // 종이 결
+  const im=g.getImageData(0,0,S,S), d=im.data;
+  for(let i=0;i<d.length;i+=4){
+    const n=(Math.random()-.5)*26; d[i]+=n; d[i+1]+=n; d[i+2]+=n;
+  }
+  g.putImageData(im,0,0);
+  const t=new THREE.CanvasTexture(cv);
+  t.wrapS=t.wrapT=THREE.RepeatWrapping; t.colorSpace=THREE.SRGBColorSpace;
+  return t;
+}
+// 박스마다 clone하면 107장이 각각 GPU에 올라가 VRAM을 낭비한다.
+// 변형 6장만 만들어 box_id로 돌려 쓴다(같은 규격이 반복돼도 무늬가 겹쳐 보이지 않음).
+const CARTON_POOL=[];
+for(let i=0;i<6;i++){
+  const t=cartonTexture();
+  t.repeat.set(1/26,1/26);
+  t.offset.set(i*0.17,i*0.29);
+  CARTON_POOL.push(t);
+}
+
+/* ══════════ 합판 바닥 텍스처 ══════════ */
+function plywoodTexture(){
+  const cv=document.createElement('canvas'); cv.width=512; cv.height=512;
+  const g=cv.getContext('2d');
+  g.fillStyle='#C9A878'; g.fillRect(0,0,512,512);
+  for(let i=0;i<512;i+=3){
+    g.strokeStyle='rgba(120,88,52,'+(0.05+Math.random()*0.07)+')';
+    g.beginPath(); g.moveTo(0,i); g.lineTo(512,i+(Math.random()-.5)*4); g.stroke();
+  }
+  // 판재 이음선
+  g.strokeStyle='rgba(90,64,38,.45)'; g.lineWidth=2;
+  for(let x=0;x<=512;x+=64){ g.beginPath(); g.moveTo(x,0); g.lineTo(x,512); g.stroke(); }
+  const t=new THREE.CanvasTexture(cv);
+  t.wrapS=t.wrapT=THREE.RepeatWrapping; t.colorSpace=THREE.SRGBColorSpace;
+  return t;
+}
+
+/* ══════════ 코러게이트(주름) 벽 텍스처 ══════════ */
+function corrugatedTexture(vertical){
+  const cv=document.createElement('canvas'); cv.width=cv.height=256;
+  const g=cv.getContext('2d');
+  g.fillStyle='#96A3B4'; g.fillRect(0,0,256,256);
+  for(let i=0;i<256;i+=32){
+    const grd=vertical?g.createLinearGradient(i,0,i+32,0):g.createLinearGradient(0,i,0,i+32);
+    grd.addColorStop(0,'#6E7F93'); grd.addColorStop(.35,'#B7C2D0');
+    grd.addColorStop(.65,'#B7C2D0'); grd.addColorStop(1,'#6E7F93');
+    g.fillStyle=grd;
+    if(vertical)g.fillRect(i,0,32,256); else g.fillRect(0,i,256,32);
+  }
+  const t=new THREE.CanvasTexture(cv);
+  t.wrapS=t.wrapT=THREE.RepeatWrapping; t.colorSpace=THREE.SRGBColorSpace;
+  return t;
+}
+
+/* ══════════ 라벨(송장) 텍스처 ══════════ */
+const labelCache={};
+function labelTexture(dest,id){
+  const k=dest+'|'+id; if(labelCache[k])return labelCache[k];
+  const cv=document.createElement('canvas'); cv.width=128; cv.height=88;
+  const g=cv.getContext('2d');
+  g.fillStyle='#FBFBF7'; g.fillRect(0,0,128,88);
+  g.strokeStyle='#C8C8C0'; g.lineWidth=2; g.strokeRect(1,1,126,86);
+  g.fillStyle=DEST_COLOR[dest]||'#444'; g.fillRect(0,0,128,26);
+  g.fillStyle='#fff'; g.font='bold 19px sans-serif'; g.textBaseline='middle';
+  g.fillText('DEST '+dest,8,14);
+  g.fillStyle='#222'; g.font='bold 15px monospace';
+  g.fillText('#'+id,8,44);
+  // 바코드
+  let x=8; g.fillStyle='#111';
+  while(x<118){ const w=1+Math.random()*3; g.fillRect(x,58,w,22); x+=w+1+Math.random()*3; }
+  const t=new THREE.CanvasTexture(cv); t.colorSpace=THREE.SRGBColorSpace;
+  labelCache[k]=t; return t;
+}
+
+/* ══════════ 컨테이너 — 실물형, 내부 완전 투시 ══════════ */
+const STEEL=0x53606F, STEEL_DARK=0x2F3742;
+
+function addBeam(w,h,d,x,y,z,color){
+  const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),
+    new THREE.MeshLambertMaterial({color:color||STEEL}));
+  m.position.set(x,y,z); m.castShadow=false; m.receiveShadow=true; root.add(m); return m;
+}
+
+function buildContainer(){
+  // ── 바닥: 합판 (불투명, 실물감의 핵심)
+  const ft=plywoodTexture(); ft.repeat.set(L/120,W/120);
+  const fl=new THREE.Mesh(new THREE.PlaneGeometry(L,W),
+    new THREE.MeshLambertMaterial({map:ft}));
+  fl.rotation.x=-Math.PI/2; fl.position.set(L/2,0,W/2); fl.receiveShadow=true; root.add(fl);
+
+  // ── 벽/천장: 코러게이트, BackSide + 반투명 (내부가 보인다)
+  const wallT=corrugatedTexture(true); wallT.repeat.set(L/70,H/70);
+  const wallMat=new THREE.MeshLambertMaterial({
+    map:wallT,color:0xE4EAF1,transparent:true,opacity:.34,
+    side:THREE.BackSide,depthWrite:false});
+  const roofT=corrugatedTexture(false); roofT.repeat.set(L/70,W/70);
+  const roofMat=new THREE.MeshLambertMaterial({
+    map:roofT,color:0xE4EAF1,transparent:true,opacity:.22,
+    side:THREE.BackSide,depthWrite:false});
+  const shell=new THREE.Mesh(new THREE.BoxGeometry(L,H,W),
+    [wallMat,wallMat,roofMat,wallMat,wallMat,wallMat]);
+  shell.position.set(L/2,H/2,W/2); root.add(shell);
+
+  // ── 프레임: 코너포스트 4 + 상하 레일 8 (얇은 실물 강재)
+  const T=7;
+  [[0,0],[0,W],[L,0],[L,W]].forEach(([x,z])=>addBeam(T,H,T,x,H/2,z));
+  [0,H].forEach(y=>{
+    addBeam(L,T,T,L/2,y,0); addBeam(L,T,T,L/2,y,W);
+    addBeam(T,T,W,0,y,W/2); addBeam(T,T,W,L,y,W/2);
+  });
+  // ── 코너 캐스팅 8개
+  [[0,0,0],[0,0,W],[L,0,0],[L,0,W],[0,H,0],[0,H,W],[L,H,0],[L,H,W]]
+    .forEach(([x,y,z])=>addBeam(16,12,12,x,y,z,STEEL_DARK));
+
+  // ── 도어(x=0): 두 짝을 바깥으로 활짝 연 상태 — 개구부는 완전히 비운다
+  const doorT=corrugatedTexture(true); doorT.repeat.set(W/2/60,H/60);
+  // 힌지는 x=0 면의 양 옆 모서리(z=0, z=W). 패널은 항상 로컬 +X 방향으로
+  // 뻗고, rotation.y 로 닫힘(면 안)→열림(바깥쪽)까지 돌린다.
+  //   닫힘: hinge z=0 → -PI/2,  hinge z=W → +PI/2
+  //   열림: 거기서 약 108도 더 바깥으로
+  const OPEN=2.05;   // 약 115도 개방 — 측벽에 접어 붙이면(270도) 화물을 가려서 이 각도로 세운다
+  [[0,-1],[W,1]].forEach(([hz,sgn])=>{
+    const leaf=new THREE.Group();
+    // 도어도 반투명 — 어느 각도에서 봐도 화물을 가리지 않게 한다
+    const panel=new THREE.Mesh(new THREE.BoxGeometry(W/2-3,H-10,3.5),
+      new THREE.MeshLambertMaterial({map:doorT,color:0xC3CDDA,
+        transparent:true,opacity:.55,depthWrite:false}));
+    panel.position.set(W/4,0,0); leaf.add(panel);
+    [0.30,0.70].forEach(f=>{
+      const bar=new THREE.Mesh(new THREE.CylinderGeometry(2.4,2.4,H-26,10),
+        new THREE.MeshLambertMaterial({color:STEEL_DARK,transparent:true,opacity:.75}));
+      bar.position.set((W/2-3)*f,0,2.6); leaf.add(bar);
+    });
+    leaf.position.set(0,H/2,hz);
+    leaf.rotation.y=sgn*(Math.PI/2+OPEN);
+    root.add(leaf);
+  });
+  // 도어 프레임 강조
+  addBeam(9,H,9,0,H/2,0,STEEL_DARK); addBeam(9,H,9,0,H/2,W,STEEL_DARK);
+  addBeam(9,9,W,0,H,W/2,STEEL_DARK);
+
+  // ── 바깥 지면
+  const gl=new THREE.Mesh(new THREE.PlaneGeometry(L*2.2,W*4),
+    new THREE.MeshLambertMaterial({color:0xE6EAF0}));
+  gl.rotation.x=-Math.PI/2; gl.position.set(L/2,-7,W/2); gl.receiveShadow=true; root.add(gl);
+}
+
+/* ══════════ 화물 — 골판지 카톤 ══════════ */
+const geoCache={};
+function roundedRectShape(w,h,r){
+  const s=new THREE.Shape(),x=-w/2,y=-h/2;
+  s.moveTo(x+r,y); s.lineTo(x+w-r,y); s.quadraticCurveTo(x+w,y,x+w,y+r);
+  s.lineTo(x+w,y+h-r); s.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+  s.lineTo(x+r,y+h); s.quadraticCurveTo(x,y+h,x,y+h-r);
+  s.lineTo(x,y+r); s.quadraticCurveTo(x,y,x+r,y);
+  return s;
+}
+function cargoGeometry(dx,dy,dz){
+  const k=dx+'|'+dy+'|'+dz; if(geoCache[k])return geoCache[k];
+  const b=Math.max(0.4,Math.min(Math.min(dx,dy,dz)*0.025,1.8));
+  const geo=new THREE.ExtrudeGeometry(roundedRectShape(dx-b*2,dz-b*2,b),
+    {depth:Math.max(0.1,dy-b*2),bevelEnabled:true,bevelThickness:b,bevelSize:b,
+     bevelSegments:2,curveSegments:2,steps:1});
+  geo.translate(0,0,-Math.max(0.1,dy-b*2)/2);
+  geo.computeVertexNormals();
+  // 면 방향 명암을 vertex color로 구워넣기
+  const nor=geo.attributes.normal,n=geo.attributes.position.count;
+  const col=new Float32Array(n*3);
+  for(let i=0;i<n;i++){
+    const nx=nor.getX(i),ny=nor.getY(i),nz=nor.getZ(i);
+    let f=1+0.10*Math.max(0,ny)-0.20*Math.max(0,-ny)
+           -0.10*Math.abs(nx)-0.16*Math.abs(nz);
+    // 베벨 링(축에 정렬되지 않은 법선)을 어둡게 → 붙어 있는 같은 색 박스가
+    // 한 덩어리로 뭉쳐 보이지 않고 개별 카톤으로 분리돼 보인다.
+    const align=Math.max(Math.abs(nx),Math.abs(ny),Math.abs(nz));
+    if(align<0.955) f*=0.62;
+    col[i*3]=col[i*3+1]=col[i*3+2]=f;
+  }
+  geo.setAttribute('color',new THREE.BufferAttribute(col,3));
+  geoCache[k]=geo; return geo;
+}
+
+const destIdx={};
+function destColor(d){
+  if(DEST_COLOR[d])return DEST_COLOR[d];
+  if(!(d in destIdx))destIdx[d]=Object.keys(destIdx).length;
+  return FALLBACK[destIdx[d]%FALLBACK.length];
+}
+
+function buildBoxes(){
+  boxes.forEach(b=>{
+    const hex=destColor(b.destination);
+    // 같은 목적지라도 카톤마다 미세하게 다른 색 — 플라스틱 블록처럼
+    // 똑같이 찍어낸 느낌을 없애는 가장 효과적인 장치.
+    const c=new THREE.Color(hex);
+    const hsl={}; c.getHSL(hsl);
+    const j=(((b.box_id*2654435761)>>>0)%1000)/1000-0.5;
+    c.setHSL(hsl.h+j*0.012, Math.min(1,hsl.s*(1+j*0.10)), hsl.l*(1+j*0.09));
+    const tex=CARTON_POOL[b.box_id%CARTON_POOL.length];
+    const mat=new THREE.MeshLambertMaterial({color:c,map:tex,vertexColors:true});
+    const mesh=new THREE.Mesh(cargoGeometry(b.dx,b.dy,b.dz),mat);
+    mesh.position.set(b.x+b.dx/2,b.z+b.dz/2,b.y+b.dy/2);
+    mesh.castShadow=true; mesh.receiveShadow=true;
+    root.add(mesh);
+
+    // ── 윗면 테이프 이음선 (카톤의 결정적 단서)
+    const tape=new THREE.Mesh(new THREE.PlaneGeometry(b.dx*0.98,Math.min(b.dy*0.22,9)),
+      new THREE.MeshLambertMaterial({color:0xD8C49A,transparent:true,opacity:.92}));
+    tape.rotation.x=-Math.PI/2;
+    tape.position.set(b.x+b.dx/2,b.z+b.dz+0.4,b.y+b.dy/2);
+    root.add(tape);
+    // 플랩 접합선
+    const seam=new THREE.Mesh(new THREE.PlaneGeometry(b.dx*0.98,0.7),
+      new THREE.MeshBasicMaterial({color:0x000000,transparent:true,opacity:.18}));
+    seam.rotation.x=-Math.PI/2;
+    seam.position.set(b.x+b.dx/2,b.z+b.dz+0.5,b.y+b.dy/2);
+    root.add(seam);
+
+    // ── 송장 라벨: 문(x=0)을 향하는 면에, 충분히 큰 화물에만
+    if(b.dy>=34&&b.dz>=34){
+      const lw=Math.min(b.dy*0.62,30), lh=lw*0.68;
+      const lab=new THREE.Mesh(new THREE.PlaneGeometry(lw,lh),
+        new THREE.MeshLambertMaterial({map:labelTexture(b.destination,b.box_id),
+          transparent:true}));
+      lab.rotation.y=-Math.PI/2;
+      lab.position.set(b.x-0.5,b.z+b.dz*0.62,b.y+b.dy/2);
+      root.add(lab);
+    }
+  });
+}
+
+buildContainer(); buildBoxes();
+
+const span=Math.max(L,W,H)*0.8;
+key.position.set(L/2-span*0.6,H+span*1.3,W/2+span*0.7);
+key.target.position.set(L/2,0,W/2); scene.add(key.target);
+fill.position.set(L*1.6,H*1.4,-W*1.2);
+rim.position.set(-L*0.6,H*0.5,W*2);
+const sc=key.shadow.camera;
+sc.left=-span*1.9; sc.right=span*1.9; sc.top=span*1.9; sc.bottom=-span*1.9;
+sc.near=1; sc.far=span*6; sc.updateProjectionMatrix();
+key.shadow.mapSize.set(2048,2048);
+
+/* 카메라 */
+function setCam(az,el,dist){
+  const cx=L/2,cy=H/2,cz=W/2;
+  camera.position.set(cx+dist*Math.cos(el)*Math.cos(az),cy+dist*Math.sin(el),
+                      cz+dist*Math.cos(el)*Math.sin(az));
+  camera.lookAt(cx,cy*0.85,cz);
+}
+let az=2.46, el=0.30, dist=1120;
+function draw(){setCam(az,el,dist);renderer.render(scene,camera)}
+draw(); window.__ready=true;
+window.__setCam=(a,e,d)=>{az=a;el=e;dist=d;draw()};
+// 간단 궤도 조작 — 드래그 회전 / 휠 확대
+let drag=false,px=0,py=0;
+cv.addEventListener('pointerdown',e=>{drag=true;px=e.clientX;py=e.clientY});
+addEventListener('pointerup',()=>drag=false);
+addEventListener('pointermove',e=>{
+  if(!drag)return;
+  az-=(e.clientX-px)*0.006; el=Math.max(-0.2,Math.min(1.3,el+(e.clientY-py)*0.004));
+  px=e.clientX;py=e.clientY;draw();
+});
+cv.addEventListener('wheel',e=>{e.preventDefault();dist=Math.max(350,Math.min(3000,dist*(1+e.deltaY*0.0012)));draw()},{passive:false});
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth,innerHeight);draw()});
+// 뷰 프리셋 버튼
+const bar=document.createElement('div');
+bar.style.cssText='position:fixed;left:16px;top:16px;display:flex;gap:6px;font:600 13px system-ui';
+[['ISO',2.46,.30,1120],['DOOR',3.06,.13,960],['TOP',2.46,1.25,1250],['SIDE',1.57,.10,1150]]
+ .forEach(([n,a,e2,d])=>{
+  const b=document.createElement('button');
+  b.textContent=n;
+  b.style.cssText='padding:7px 13px;border:1px solid #C9D2DE;background:#fff;border-radius:8px;cursor:pointer';
+  b.onclick=()=>{az=a;el=e2;dist=d;draw()};
+  bar.appendChild(b);
+});
+document.body.appendChild(bar);
+</script></body></html>

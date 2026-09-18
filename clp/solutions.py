@@ -292,6 +292,73 @@ def pick_by_weight(front: List, cont: Container, util_weight: float) -> Dict[str
     )
 
 
+def sweep_reachable(front: List, cont: Container, steps: int = 1000) -> List[Dict[str, Any]]:
+    """
+    [추가됨] 정적 데모(GitHub Pages)용 — 가중치 슬라이더로 "도달 가능한" 해를
+    전부 미리 뽑아 둔다.
+
+    슬라이더 자체는 서버가 필요 없다. 어느 해를 고를지는 프론트엔드도
+    똑같이 계산하고 있고(wbPickIndex, 눈금 표시용), 실제로 서버와 1,001개
+    지점에서 완전히 일치하는 것을 확인했다. 정적 모드에서 못 쓰던 유일한
+    이유는 "고른 해의 박스 좌표"가 demo-result.json에 없어서였다.
+
+    그래서 여기서 가중치 0~1을 훑어 실제로 선택되는 해를 모두 모아,
+    각각의 좌표까지 직렬화해 번들에 넣는다. 해 하나당 약 18KB이고 보통
+    5~15개라 정적 호스팅에 올리기에 충분히 작다.
+
+    각 항목의 w_lo/w_hi는 그 해가 선택되는 가중치 구간이라, 프론트는
+    슬라이더 값이 어느 구간에 드는지만 보면 된다.
+    """
+    if not front:
+        return []
+
+    scored = [(ind, getattr(ind, "_orig_metrics", None) or _metrics(ind, cont)) for ind in front]
+    utils = [m["utilization"] for _, m in scored]
+    relocs = [m["relocation"] for _, m in scored]
+    u_lo, u_hi = min(utils), max(utils)
+    r_lo, r_hi = min(relocs), max(relocs)
+    RHO = 1e-3
+
+    def pick_index(w: float) -> int:
+        best, bkey = -1, None
+        for i, (_, m) in enumerate(scored):
+            un = (m["utilization"] - u_lo) / (u_hi - u_lo) if u_hi > u_lo else 1.0
+            rn = (r_hi - m["relocation"]) / (r_hi - r_lo) if r_hi > r_lo else 1.0
+            du, dr = 1.0 - un, 1.0 - rn
+            d = max(w * du, (1.0 - w) * dr) + RHO * (du + dr)
+            key = (d, -m["utilization"], m["relocation"])
+            if best < 0 or key < bkey:
+                best, bkey = i, key
+        return best
+
+    # 가중치 구간별로 어떤 개체가 뽑히는지 스윕
+    spans: List[Dict[str, Any]] = []
+    prev_idx = None
+    for k in range(steps + 1):
+        w = k / steps
+        idx = pick_index(w)
+        if idx != prev_idx:
+            spans.append({"idx": idx, "w_lo": w, "w_hi": w})
+            prev_idx = idx
+        else:
+            spans[-1]["w_hi"] = w
+
+    out: List[Dict[str, Any]] = []
+    for sp in spans:
+        ind, m0 = scored[sp["idx"]]
+        sol = _finalize_pick(
+            ind, cont, "custom", "직접 조정",
+            "가중치 슬라이더로 고른 해입니다",
+        )
+        # w_lo/w_hi: 이 해가 선택되는 가중치 구간
+        # orig: 파레토 그래프의 회색 점 좌표(재시도 전) — 점 클릭 매칭용
+        sol["w_lo"] = round(sp["w_lo"], 4)
+        sol["w_hi"] = round(sp["w_hi"], 4)
+        sol["orig"] = {"utilization": m0["utilization"], "relocation": m0["relocation"]}
+        out.append(sol)
+    return out
+
+
 def _serialize(ind, cont: Container) -> List[Dict[str, Any]]:
     """
     3D 렌더링용 좌표 직렬화. 적재 순서를 함께 담아 애니메이션(과 명세서

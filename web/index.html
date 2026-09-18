@@ -2092,7 +2092,13 @@ function loadResultData(data){
   // 슬라이더를 보여준다 — "현장 대응"(휴리스틱)은 해가 1개뿐이라 조정할
   // 프론트 자체가 없으므로 슬라이더도 의미가 없다.
   const wb=document.getElementById('weightBox');
-  const canWeight=!STATIC_MODE && result.mode==='precise' && (result.front_size||0)>1;
+  /* [수정됨] 정적 데모에서도 슬라이더를 쓴다. 어느 해를 고를지는 프론트가
+     서버와 동일하게 계산하므로(wbPickIndex) 서버가 필요 없고, 좌표만
+     demo-result.json에 번들돼 있으면 된다(tools/export_demo.py). */
+  const staticSlider = STATIC_MODE && Array.isArray(result.slider_solutions)
+                       && result.slider_solutions.length>1;
+  const canWeight=(!STATIC_MODE || staticSlider) && result.mode==='precise'
+                  && (result.front_size||0)>1;
   if(canWeight){
     wb.classList.add('on');
     // [수정됨] 팀 피드백: '용적률 최적화'/'시간(리핸들링) 최적화' 버튼이
@@ -2380,16 +2386,32 @@ function onWeightInput(e){
 // applyWeight(pos)의 인자는 "슬라이더 위치(0~100)"다. 실제 서버로 보내는
 // 가중치는 posToWeight()로 변환한 값 — 양 끝 데드존을 잘라냈기 때문에
 // 슬라이더 0%가 가중치 0%를 뜻하지 않는다.
+// [추가됨] 정적 모드용 — 번들된 slider_solutions 중 이 가중치가 속한 구간의
+// 해를 찾는다. 각 항목의 w_lo~w_hi가 그 해가 선택되는 가중치 구간이다.
+function staticSolForWeight(wv){
+  const arr=(result && result.slider_solutions)||[];
+  for(let i=0;i<arr.length;i++){
+    if(wv>=arr[i].w_lo-1e-9 && wv<=arr[i].w_hi+1e-9) return arr[i];
+  }
+  return arr.length ? (wv<arr[0].w_lo ? arr[0] : arr[arr.length-1]) : null;
+}
+
 async function applyWeight(pos){
-  if(!curJobId)return;
   const wv=posToWeight(pos);
-  const w=wv.toFixed(3);
   let sol;
-  try{
-    const r=await fetch('/api/reweight/'+curJobId+'?util_weight='+w);
-    if(!r.ok)return;
-    sol=await r.json();
-  }catch(e){return}
+  if(STATIC_MODE){
+    sol=staticSolForWeight(wv);
+    if(!sol)return;
+    sol=Object.assign({},sol);        // 원본 번들을 건드리지 않는다
+  }else{
+    if(!curJobId)return;
+    const w=wv.toFixed(3);
+    try{
+      const r=await fetch('/api/reweight/'+curJobId+'?util_weight='+w);
+      if(!r.ok)return;
+      sol=await r.json();
+    }catch(e){return}
+  }
   // _weightPct는 PDF 명세서 링크(/api/manifest?util_weight=)가 같은 해를
   // 다시 찾는 데 쓰이므로, 슬라이더 위치가 아니라 "실제 가중치 %"를 넣는다.
   sol._weightPct=wv*100;
@@ -2421,14 +2443,22 @@ window.applyWeight=applyWeight;
 // applyWeight()와 달리 가중치 슬라이더는 건드리지 않고(OFF 유지), 대신
 // sol._pointUR을 남겨 PDF 다운로드 링크가 이 해를 다시 찾을 수 있게 한다.
 async function pickFrontPoint(u,r){
-  if(STATIC_MODE)return;
-  if(!curJobId)return;
   let sol;
-  try{
-    const req=await fetch('/api/pick_point/'+curJobId+'?u='+u+'&r='+r);
-    if(!req.ok)return;
-    sol=await req.json();
-  }catch(e){return}
+  if(STATIC_MODE){
+    // 번들된 해의 orig(재시도 전 좌표)와 대조 — 회색 점이 그려진 값 그대로다.
+    const arr=(result && result.slider_solutions)||[];
+    sol=arr.find(x=>x.orig && Math.abs(x.orig.utilization-u)<0.005
+                          && x.orig.relocation===r);
+    if(!sol)return;                   // 슬라이더로 도달 불가능한(피지배) 점
+    sol=Object.assign({},sol);
+  }else{
+    if(!curJobId)return;
+    try{
+      const req=await fetch('/api/pick_point/'+curJobId+'?u='+u+'&r='+r);
+      if(!req.ok)return;
+      sol=await req.json();
+    }catch(e){return}
+  }
   if(!sol || !sol.metrics)return;
   sol._pointUR={u,r};
   customSol=sol;
